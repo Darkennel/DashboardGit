@@ -67,3 +67,21 @@ body {
   font-weight: bold;
   background-color: #e9ecef;
 }
+
+.btn-reset {
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 10px;
+  background-color: #f8f9fa;
+  color: #2b5c8f;
+  border: 1px solid #2b5c8f;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-reset:hover {
+  background-color: #2b5c8f;
+  color: #ffffff;
+}

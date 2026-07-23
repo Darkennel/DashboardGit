@@ -22,7 +22,11 @@
       <label for="periode-select"><strong>Choisir une période :</strong></label><br>
       <select id="periode-select">
           <option value="">-- Toutes les periodes --</option>
+          <option value="2009_2022">2009 - 2022</option>
+          <option value="2022_2025">2022 - 2025</option>
       </select>
+
+      <button id="btn-reset" class="btn-reset">Réinitialiser les filtres</button>
       
       <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Récapitulatifs logements</h3>
       <table class="recap-table">
@@ -30,7 +34,7 @@
           <tr>
             <th>Type</th>
             <th>Logements</th>
-            <th>Surface (m²)</th>
+            <th>Surface HAB (m²)</th>
             <th>Surface ACT-EQP (m²)</th>
           </tr>
         </thead>
@@ -39,16 +43,20 @@
             <td>Intensif</td>
             <td id="log-intensif">0</td>
             <td id="surf-intensif">0</td>
+            <td id="surfACTEQPIntensif">0</td>
+
           </tr>
           <tr>
             <td>ConsoEnaf</td>
             <td id="log-enaf">0</td>
             <td id="surf-enaf">0</td>
+            <td id="surfACTEQEnaf">0</td>
           </tr>
           <tr class="total-row">
             <td>Total</td>
             <td id="log-total">0</td>
             <td id="surf-total">0</td>
+            <td id="surfARCEQUTOTAL">0</td>
           </tr>
         </tbody>
       </table>

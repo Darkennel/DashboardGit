@@ -11,26 +11,42 @@ function getPercentile(arr, q) {
 }
 
 // Calcul de ID1 et ID2
-function calculerStatistiquesSurfaces(features, communeNorm) {
+// Statistiques IC1 et IC2 avec filtre période
+function calculerStatistiquesSurfaces(features, communeNorm, periodeChoisie = "") {
   const entitesFiltrees = features.filter(f => {
     const p = f.properties;
+
     if (communeNorm && normaliserTexte(p.Commune) !== communeNorm) return false;
+    
+    // Filtre période dynamique
+    if (periodeChoisie) {
+      if (p.DateLivrai !== periodeChoisie) return false;
+    } else {
+      // Par défaut si pas de sélection : accepter les 2 périodes
+      if (p.DateLivrai !== '2009_2022' && p.DateLivrai !== '2022_2025') return false;
+    }
 
     const destHab = p.Destinatio === 'HAB';
     const etatConstruit = p.ETAT === 'CONSTRUIT';
     const urbIntensif = p.Urbanisati === 'INTENSIF';
     const typeOk = p.Type2Urban === 'DC' || p.Type2Urban === 'DP';
-    const dateOk = p.DateLivrai === '2009_2022' || p.DateLivrai === '2022_2025';
     const noOpB = p.OperationB === null || p.OperationB === undefined || p.OperationB === '';
 
-    return destHab && etatConstruit && urbIntensif && typeOk && dateOk && noOpB;
+    return destHab && etatConstruit && urbIntensif && typeOk && noOpB;
   });
 
   const surfaces = entitesFiltrees
-    .map(f => Number(f.properties.Shape_Area) || 0)
+    .map(f => Number(f.properties.Surface) || 0)
     .sort((a, b) => a - b);
 
   if (surfaces.length === 0) return { q1: 0, mediane: 0 };
+
+  function getPercentile(arr, q) {
+    const pos = (arr.length - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    return arr[base + 1] !== undefined ? arr[base] + rest * (arr[base + 1] - arr[base]) : arr[base];
+  }
 
   return {
     q1: getPercentile(surfaces, 0.25),
@@ -38,17 +54,24 @@ function calculerStatistiquesSurfaces(features, communeNorm) {
   };
 }
 
-// Calcul de ID3 (opérations groupées)
-function calculerMedianeShapeAreaOpGroupee(features, communeNorm) {
+// Statistique IC3 avec filtre période
+function calculerMedianeShapeAreaOpGroupee(features, communeNorm, periodeChoisie = "") {
   const entitesFiltrees = features.filter(f => {
     const p = f.properties;
+
     if (communeNorm && normaliserTexte(p.Commune) !== communeNorm) return false;
 
+    // Filtre période dynamique
+    if (periodeChoisie) {
+      if (p.DateLivrai !== periodeChoisie) return false;
+    } else {
+      if (p.DateLivrai !== '2009_2022' && p.DateLivrai !== '2022_2025') return false;
+    }
+
     const etatConstruit = p.ETAT === 'CONSTRUIT';
-    const dateOk = p.DateLivrai === '2009_2022' || p.DateLivrai === '2022_2025';
     const isOpGroupee = normaliserTexte(p.OperationB) === 'oui';
 
-    return etatConstruit && dateOk && isOpGroupee;
+    return etatConstruit && isOpGroupee;
   });
 
   const surfacesArea = entitesFiltrees

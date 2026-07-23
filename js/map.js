@@ -9,7 +9,7 @@ const hot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
   attribution: '&copy; OpenStreetMap contributors'
 });
 
-hot.addTo(map);
+osm.addTo(map);
 
 L.control.layers(
   { "OpenStreetMap": osm, "OpenStreetMap HOT": hot },

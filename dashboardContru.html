@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Communes SICO</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="Style.css" />
+</head>
+<body>
+  <div class="dashboard">
+    <div class="sidebar">
+      <h2>Communes SICO</h2>
+      <p>Nombre de communes : <span id="communes-count">Chargement...</span></p>
+
+      <label for="commune-select"><strong>Choisir une commune :</strong></label><br>
+      <select id="commune-select">
+          <option value="">-- Toutes les communes --</option>
+      </select>
+
+      <label for="periode-select"><strong>Choisir une période :</strong></label><br>
+      <select id="periode-select">
+          <option value="">-- Toutes les periodes --</option>
+      </select>
+      
+      <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Récapitulatifs logements</h3>
+      <table class="recap-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Logements</th>
+            <th>Surface (m²)</th>
+            <th>Surface ACT-EQP (m²)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Intensif</td>
+            <td id="log-intensif">0</td>
+            <td id="surf-intensif">0</td>
+          </tr>
+          <tr>
+            <td>ConsoEnaf</td>
+            <td id="log-enaf">0</td>
+            <td id="surf-enaf">0</td>
+          </tr>
+          <tr class="total-row">
+            <td>Total</td>
+            <td id="log-total">0</td>
+            <td id="surf-total">0</td>
+          </tr>
+        </tbody>
+      </table><h4 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Type Intensif</h4>
+      <table class ="recap-table">
+        <thead>
+          <tr>
+            <th>type Intensif</th>
+            <th>Valeur</th>
+          </tr>
+        </thead>        
+      </table>
+
+      <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Indicateurs logements</h3>
+      
+      <table class="recap-table">
+        <thead>
+          <tr>
+            <th>Indicateur</th>
+            <th>Valeur</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ID1 (Q1)</td>
+            <td id="log-IC1">0 m²</td>
+          </tr>
+          <tr>
+            <td>ID2 (Médiane)</td>
+            <td id="log-IC2">0 m²</td>
+          </tr>
+          <tr>
+            <td>ID3 (Médiane)</td>
+            <td id="log-IC3">0 m²</td>
+          </tr>            
+        </tbody>        
+      </table>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="CommunesSico.js"></script>
+  <script src="SuiviConstru.js"></script>
+
+  <script>
+    // Normaliser les chaînes de texte
+    function normaliserTexte(str) {
+      if (!str) return "";
+      return str
+        .toString()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Supprime les accents
+        .replace(/[-_']/g, " ")                           // Remplace tirets/apostrophes
+        .replace(/\s+/g, " ")                             // Nettoie espaces multiples
+        .trim();
+    }
+
+    // Initialisation de la carte Leaflet
+    const map = L.map('map');
+
+    const osm = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '&copy; OpenStreetMap contributors' }
+    );
+
+    const hot = L.tileLayer(
+        'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+        { attribution: '&copy; OpenStreetMap contributors' }
+    );
+
+    hot.addTo(map);
+
+    L.control.layers(
+        { "OpenStreetMap": osm, "OpenStreetMap HOT": hot },
+        {}
+    ).addTo(map);
+
+    // Style des communes
+    const styleNormal = {
+        color: "#2b5c8f",
+        weight: 2,
+        fillColor: "#6baed6",
+        fillOpacity: 0.35
+    };
+    
+    const styleSelection = {
+        color: "#c48a00",
+        weight: 3,
+        fillColor: "#ffe082",
+        fillOpacity: 0.1
+    };
+
+    const communesLayer = L.geoJSON(communesData, { style: styleNormal }).addTo(map);
+
+    // Couche Suivi des constructions
+    const suiviLayer = L.geoJSON(suiviConstru, {
+        style: {
+            color: "#c0392b",
+            weight: 1,
+            fillColor: "#e74c3c",
+            fillOpacity: 0.6
+        }
+    }).addTo(map);
+
+    map.fitBounds(communesLayer.getBounds());
+    document.getElementById("communes-count").textContent = communesLayer.getLayers().length;
+
+    // Calcul de l'indicateur IC1
+    // Calcul de l'indicateur ID1, ID2
+    function calculerStatistiquesSurfaces(features, communeNorm) {
+      // On filtre pour obtenir la liste exacte des entités validées
+      const entitesFiltrees = features.filter(f => {
+        const p = f.properties;
+
+        // Filtre par commune si sélectionnée
+        if (communeNorm && normaliserTexte(p.Commune) !== communeNorm) {
+          return false;
+        }
+
+        // Critères stricts
+        const destHab = p.Destinatio === 'HAB';
+        const etatConstruit = p.ETAT === 'CONSTRUIT';
+        const urbIntensif = p.Urbanisati === 'INTENSIF';
+        const typeOk = p.Type2Urban === 'DC' || p.Type2Urban === 'DP';
+        const dateOk = p.DateLivrai === '2009_2022' || p.DateLivrai === '2022_2025';
+        const noOpB = p.OperationB === null || p.OperationB === undefined || p.OperationB === '';
+
+        return destHab && etatConstruit && urbIntensif && typeOk && dateOk && noOpB;
+      });
+
+      // Log dans la console pour inspecter les entités conservées
+      console.log("--- ENTITÉS FILTRÉES IC1 ---");
+      console.log(`Nombre d'entités trouvées : ${entitesFiltrees.length}`);
+      console.table(entitesFiltrees.map(f => f.properties)); // Affiche un tableau clair des propriétés dans la console
+      // 2. Extraire et trier les surfaces par ordre croissant
+      const surfaces = entitesFiltrees
+        .map(f => Number(f.properties.Shape_Area) || 0)
+        .sort((a, b) => a - b);
+
+      console.log("--- SURFACES DES ENTITÉS FILTRÉES (TRIÉES) ---", surfaces);
+
+      if (surfaces.length === 0) {
+        return { q1: 0, mediane: 0 };
+      }
+      // Fonction helper pour calculer un percentile
+      function getPercentile(arr, q) {
+        const pos = (arr.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (arr[base + 1] !== undefined) {
+          return arr[base] + rest * (arr[base + 1] - arr[base]);
+        } else {
+          return arr[base];
+        }
+      }
+
+    const q1 = getPercentile(surfaces, 0.25);
+    const mediane = getPercentile(surfaces, 0.50);
+
+    return { q1, mediane };
+
+    }   
+    // Calcul de la médiane de Shape_Area pour les opérations groupées (IC3)
+    function calculerMedianeShapeAreaOpGroupee(features, communeNorm) {
+      const entitesFiltrees = features.filter(f => {
+        const p = f.properties;
+
+        if (communeNorm && normaliserTexte(p.Commune) !== communeNorm) {
+          return false;
+        }
+
+        const etatConstruit = p.ETAT === 'CONSTRUIT';
+        const dateOk = p.DateLivrai === '2009_2022' || p.DateLivrai === '2022_2025';
+        const isOpGroupee = normaliserTexte(p.OperationB) === 'oui';
+
+        return etatConstruit && dateOk && isOpGroupee;
+      });
+
+      // Extraction et tri des valeurs Shape_Area
+      const surfacesArea = entitesFiltrees
+        .map(f => Number(f.properties.Shape_Area) || 0)
+        .sort((a, b) => a - b);
+
+      console.log("--- ENTITÉS FILTRÉES IC3 (OP. GROUPÉES) ---");
+      console.log(`Nombre d'entités IC3 : ${surfacesArea.length}`);
+      console.log("Shape_Area triées :", surfacesArea);
+
+      if (surfacesArea.length === 0) return 0;
+
+      // Calcul de la médiane
+      const mid = Math.floor((surfacesArea.length - 1) / 2);
+      if (surfacesArea.length % 2 === 0) {
+        return (surfacesArea[mid] + surfacesArea[mid + 1]) / 2;
+      } else {
+        return surfacesArea[mid];
+      }
+    }    
+    // Mise à jour complète du tableau et des indicateurs
+    function mettreAJourTableau(features, communeChoisie = "") {
+      let logIntensif = 0, surfIntensif = 0;
+      let logEnaf = 0, surfEnaf = 0;
+
+      const communeNorm = normaliserTexte(communeChoisie);
+      console.log("CommuneFiltreID1 = ",communeChoisie);
+      features.forEach(f => {
+        const p = f.properties;
+        const nbLog = Number(p.NBLogement) || 0;
+        const surf = Number(p.Surface) || 0;
+        const typeUrb = normaliserTexte(p.Urbanisati);
+
+        if (typeUrb.includes("intensif")) {
+          logIntensif += nbLog;
+          surfIntensif += surf;
+        } else if (typeUrb.includes("conso enaf") || typeUrb.includes("conso_enaf")) {
+          logEnaf += nbLog;
+          surfEnaf += surf;
+        }
+      });
+
+      // Calcul du ID1 et ID2
+      const stats = calculerStatistiquesSurfaces(features, communeNorm);
+      // Calcul de ID3
+      const medianeShapeArea = calculerMedianeShapeAreaOpGroupee(features, communeNorm);
+      // Injections DOM
+      document.getElementById("log-intensif").textContent = logIntensif.toLocaleString("fr-FR");
+      document.getElementById("surf-intensif").textContent = Math.round(surfIntensif).toLocaleString("fr-FR");
+
+      // Injection du 1er quartile dans IC1 et de la Médiane dans IC2
+      document.getElementById("log-IC1").textContent = Math.round(stats.q1).toLocaleString("fr-FR") + " m²";
+      document.getElementById("log-IC2").textContent = Math.round(stats.mediane).toLocaleString("fr-FR") + " m²";
+      document.getElementById("log-IC3").textContent = Math.round(medianeShapeArea).toLocaleString("fr-FR") + " m²";
+
+
+      document.getElementById("log-enaf").textContent = logEnaf.toLocaleString("fr-FR");
+      document.getElementById("surf-enaf").textContent = Math.round(surfEnaf).toLocaleString("fr-FR");
+
+      document.getElementById("log-total").textContent = (logIntensif + logEnaf).toLocaleString("fr-FR");
+      document.getElementById("surf-total").textContent = Math.round(surfIntensif + surfEnaf).toLocaleString("fr-FR");
+    }
+
+    // Calcul global au lancement
+    mettreAJourTableau(suiviConstru.features, "");
+
+    // Gestion de la liste déroulante
+    const select = document.getElementById("commune-select");
+    const communes = [];
+
+    communesLayer.eachLayer(layer => {
+        communes.push({
+            nom: layer.feature.properties.NOMCOM,
+            layer: layer
+        });
+    });
+
+    communes.sort((a, b) => a.nom.localeCompare(b.nom));
+    communes.forEach(c => {
+        const option = document.createElement("option");
+        option.value = c.nom;
+        option.textContent = c.nom;
+        select.appendChild(option);
+    });
+
+    select.addEventListener("change", function () {
+      const communeChoisie = this.value;
+      const communeNorm = normaliserTexte(communeChoisie);
+
+      communesLayer.eachLayer(layer => layer.setStyle(styleNormal));
+
+      if (communeChoisie === "") {
+        suiviLayer.clearLayers();
+        suiviLayer.addData(suiviConstru.features);
+
+        mettreAJourTableau(suiviConstru.features, "");
+        map.fitBounds(communesLayer.getBounds());
+        return;
+      }
+
+      // Filtrage dynamique
+      const featuresFiltrees = suiviConstru.features.filter(feature =>
+        normaliserTexte(feature.properties.Commune) === communeNorm
+      );
+
+      suiviLayer.clearLayers();
+      suiviLayer.addData(featuresFiltrees);
+
+      mettreAJourTableau(featuresFiltrees, communeChoisie);
+
+      const commune = communes.find(c => normaliserTexte(c.nom) === communeNorm);
+      if (commune) {
+        commune.layer.setStyle(styleSelection);
+        commune.layer.bringToFront();
+
+        map.fitBounds(commune.layer.getBounds(), {
+          padding: [20, 20],
+          maxZoom: 18
+        });
+      }
+    });
+  </script>
+</body>
+</html>

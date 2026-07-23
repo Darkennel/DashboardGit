@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Communes SICO</title>
+  <!-- Stylesheet Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Ton fichier de style -->
+  <link rel="stylesheet" href="Style.css" />
+</head>
+<body>
+  <div class="dashboard">
+    <div class="sidebar">
+      <h2>Communes SICO</h2>
+      <p>Nombre de communes : <span id="communes-count">Chargement...</span></p>
+
+      <label for="commune-select"><strong>Choisir une commune :</strong></label><br>
+      <select id="commune-select">
+          <option value="">-- Toutes les communes --</option>
+      </select>
+
+      <label for="periode-select"><strong>Choisir une période :</strong></label><br>
+      <select id="periode-select">
+          <option value="">-- Toutes les periodes --</option>
+      </select>
+      
+      <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Récapitulatifs logements</h3>
+      <table class="recap-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Logements</th>
+            <th>Surface (m²)</th>
+            <th>Surface ACT-EQP (m²)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Intensif</td>
+            <td id="log-intensif">0</td>
+            <td id="surf-intensif">0</td>
+          </tr>
+          <tr>
+            <td>ConsoEnaf</td>
+            <td id="log-enaf">0</td>
+            <td id="surf-enaf">0</td>
+          </tr>
+          <tr class="total-row">
+            <td>Total</td>
+            <td id="log-total">0</td>
+            <td id="surf-total">0</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <h4 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Type Intensif</h4>
+      <table class="recap-table">
+        <thead>
+          <tr>
+            <th>type Intensif</th>
+            <th>Valeur</th>
+          </tr>
+        </thead>        
+      </table>
+
+      <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Indicateurs logements</h3>
+      <table class="recap-table">
+        <thead>
+          <tr>
+            <th>Indicateur</th>
+            <th>Valeur</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ID1 (Q1)</td>
+            <td id="log-IC1">0 m²</td>
+          </tr>
+          <tr>
+            <td>ID2 (Médiane)</td>
+            <td id="log-IC2">0 m²</td>
+          </tr>
+          <tr>
+            <td>ID3 (Médiane)</td>
+            <td id="log-IC3">0 m²</td>
+          </tr>            
+        </tbody>        
+      </table>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+  <!-- 1. Librairie tierce -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- 2. Données (fichiers contenant tes variables communesData et suiviConstru) -->
+  <script src="Data/CommunesSico.js"></script>
+  <script src="Data/SuiviConstru.js"></script>
+
+  <!-- 3. Tes scripts d'application (L'ordre est important !) -->
+  <script src="js/util.js"></script>
+  <script src="js/calcul.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

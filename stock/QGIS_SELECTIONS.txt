@@ -1,0 +1,44 @@
+ID1 et 1D2
+"COMM"  =  'LABASTIDE-BEAUVOIR' AND  "TYPE"  =  'INTENSIF' AND "DEST"  =  'HAB' AND "FU"  =  'INDIV' AND ( "TYPE_2" = 'DC' OR "TYPE_2" = 'DP')
+
+"Commune"  =  'xx' AND  "Destinatio"  =  'HAB' AND  "ETAT"  =  'CONSTRUIT' AND "Urbanisati"  =  'INTENSIF' AND ( "Type2Urban"  =  'DC' OR "Type2Urban"  = 'DP') AND ("DateLivrai" =  '2009_2022' OR  "DateLivrai" = '2022_2025') AND "OperationB" IS NULL
+
+ID3
+"COMM"  =  'LABASTIDE-BEAUVOIR' AND "OP"  =  'OP' 
+
+"Commune"  =  'xx' AND  "ETAT" =  'CONSTRUIT' AND ("DateLivrai" =  '2009_2022' OR  "DateLivrai" = '2022_2025') AND "OperationB" = 'oui'  
+
+
+
+->'xx' 
+"COMMUNE"  =   'xx' 
+
+-> EXT
+"COMMUNE"  =  'xx' AND ("ZONAGE"  =  'AU' OR "ZONAGE"  =  'AU0' OR "NAF"  =  'ENAF')
+
+-> NO_POT
+"COMMUNE"  =   'xx'  AND  "POTENTIEL" <>  'EXT' AND ("DEST"  =  'ACT' OR  "DEST"  =  'EQUIP' OR  "MOBILIS"  =  'AV_2025' OR  "SURF" < 590)
+
+-> sélection manuelle des potentiels hameaux
+
+-> PDD
+"COMMUNE"  =  'xx' AND  "POTENTIEL"  =  'xx' 
+
+-> OP
+"COMMUNE"  =  'xx' AND "POTENTIEL"  =  'PDD' AND "SURF" >3000
++ sélection manuelle si besoin (projets connus, etc.)
+
+
+DECOMPTE surfaces PDD
+"COMMUNE"  =  'MONTGISCARD' AND "POTENTIEL"  =  'PDD'
+
+DECOMPTE surfaces POp
+"COMMUNE"  =  'MONTGISCARD' AND "POTENTIEL"  =  'POp'
+
+
+
+CHIFFRES PRODUCTION LOGEMENTS - EXTENSION
+ "COMM"  =  'xx' AND  "DEST"  =  'HAB' AND  "TYPE"  =  'Conso ENAF' 
+
+CHIFFRES PRODUCTION LOGEMENTS - DENSIFICATION
+ "COMM"  =  'xx' AND  "DEST"  =  'HAB' AND  "TYPE"  =   'INTENSIF' 

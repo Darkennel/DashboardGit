@@ -1,0 +1,69 @@
+/* Style global */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  padding: 10px;
+  background: #f4f4f5;
+  border-right: 1px solid #dee2e6;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.sidebar select {
+  width: 100%;
+  margin-top: 5px;
+  padding: 5px;
+}
+
+.sidebar h3 {
+  margin-top: 25px;
+  border-bottom: 2px solid #2b5c8f;
+  padding-bottom: 5px;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+}
+
+/* Tableau récapitulatif */
+.recap-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+  font-size: 0.85rem;
+}
+
+.recap-table th, 
+.recap-table td {
+  border: 1px solid #dee2e6;
+  padding: 8px 6px;
+  text-align: right;
+}
+
+.recap-table th {
+  background-color: #2b5c8f;
+  color: white;
+  text-align: center;
+}
+
+.recap-table td:first-child {
+  text-align: left;
+  font-weight: bold;
+  background-color: #f1f3f5;
+}
+
+.recap-table tr.total-row {
+  font-weight: bold;
+  background-color: #e9ecef;
+}

@@ -13,23 +13,35 @@ function getPercentile(arr, q) {
 // Calcul de ID1 et ID2
 // Statistiques IC1 et IC2 avec filtre période
 function calculerStatistiquesSurfaces(features, communeNorm, periodeChoisie = "") {
+  let iterateur = 0;
   const entitesFiltrees = features.filter(f => {
     const p = f.properties;
 
     if (communeNorm && normaliserTexte(p.Commune) !== communeNorm) return false;
     if (!testerPeriode(p.DateLivrai, periodeChoisie)) return false;
 
-    const destHab = p.Destinatio === 'HAB';
-    const etatConstruit = p.ETAT === 'CONSTRUIT';
-    const urbIntensif = p.Urbanisati === 'INTENSIF';
-    const typeOk = p.Type2Urban === 'DC' || p.Type2Urban === 'DP';
-    const noOpB = p.OperationB === null || p.OperationB === undefined || p.OperationB === '';
+    // Normalisation des propriétés pour éviter les soucis de casse / espaces
+    const destHab = normaliserTexte(p.Destinatio) === 'hab';
+    const etatConstruit = normaliserTexte(p.ETAT) === 'construit';
+    const urbIntensif = normaliserTexte(p.Urbanisati) === 'intensif';
+    
+    const type2Norm = normaliserTexte(p.Type2Urban);
+    const typeOk = type2Norm === 'dc' || type2Norm === 'dp';
 
-    return destHab && etatConstruit && urbIntensif && typeOk && noOpB;
+    // IS NULL / vide
+    const opBNorm = p.OperationB ? normaliserTexte(p.OperationB) : '';
+    const noOpB = opBNorm === '' || opBNorm === 'null' || opBNorm === 'undefined';
+
+    const valide = destHab && etatConstruit && urbIntensif && typeOk && noOpB;
+    if (valide) iterateur += 1;
+
+    return valide;
   });
 
+  console.log("i = ", iterateur);
+
   const surfaces = entitesFiltrees
-    .map(f => Number(f.properties.Surface) || 0)
+    .map(f => Number(f.properties.Shape_Area) || 0)
     .sort((a, b) => a - b);
 
   if (surfaces.length === 0) return { q1: 0, mediane: 0 };

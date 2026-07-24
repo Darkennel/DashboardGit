@@ -191,28 +191,17 @@ styleControl.onAdd = function () {
 styleControl.addTo(map);
 
 
-// Initialisation de la couche avec le style par défaut
+// Remplace la création de suiviLayer à la fin de map.js par ceci :
 const suiviLayer = L.geoJSON(suiviConstru, {
   style: styleProductionLgt
+  // La gestion du click/popup sera faite dynamiquement dans main.js
 }).addTo(map);
 
 // Affichage de la légende par défaut
 legendTypologie.addTo(map);
 
-
-
-
-// Couches GeoJSON
+// Couches GeoJSON pour les communes
 const communesLayer = L.geoJSON(communesData, { style: styleNormal }).addTo(map);
-
-// const suiviLayer = L.geoJSON(suiviConstru, {
-//   style: {
-//     color: "#c0392b",
-//     weight: 1,
-//     fillColor: "#e74c3c",
-//     fillOpacity: 0.6
-//   }
-// }).addTo(map);
 
 map.fitBounds(communesLayer.getBounds());
 

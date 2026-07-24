@@ -82,11 +82,19 @@ function calculerRatioLogementsParHectare(features, communeNorm, periodeChoisie 
   return totals.nbLogementTotal / surfaceHectares;
 }
 function testerPeriode(dateLivrai, periodeChoisie) {
+  // Nettoyage de la valeur en base
+  const dateNorm = dateLivrai ? dateLivrai.toString().trim() : "";
+
+  // 1. "Toutes les périodes" (valeur vide) -> On accepte tout ce qui correspond aux 3 périodes réelles
   if (!periodeChoisie) {
-    return dateLivrai === '2009_2022' || dateLivrai === '2022_2025' || dateLivrai === '2026';
+    return dateNorm === '2009_2022' || dateNorm === '2022_2025' || dateNorm === '2026';
   }
+
+  // 2. Période cumulée "2009-2025" -> Uniquement les deux premières tranches
   if (periodeChoisie === '2009_2025') {
-    return dateLivrai === '2009_2022' || dateLivrai === '2022_2025';
+    return dateNorm === '2009_2022' || dateNorm === '2022_2025';
   }
-  return dateLivrai === periodeChoisie;
+
+  // 3. Périodes simples ("2009_2022", "2022_2025", "2026")
+  return dateNorm === periodeChoisie;
 }

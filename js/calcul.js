@@ -1,13 +1,14 @@
-// Helper privé pour les percentiles
+// Renvoie la valeur réelle au rang q (ex: 0.25 pour Q1) sans moyenne
 function getPercentile(arr, q) {
-  const pos = (arr.length - 1) * q;
-  const base = Math.floor(pos);
-  const rest = pos - base;
-  if (arr[base + 1] !== undefined) {
-    return arr[base] + rest * (arr[base + 1] - arr[base]);
-  } else {
-    return arr[base];
-  }
+  if (arr.length === 0) return 0;
+  
+  // Calcul du rang (index basé sur 1, puis arrondi au supérieur)
+  const index = Math.ceil(q * arr.length) - 1;
+  
+  // Sécurité pour éviter un index négatif si le tableau n'a qu'un élément
+  const indexSecurise = Math.max(0, index);
+  
+  return arr[indexSecurise];
 }
 
 // Calcul de ID1 et ID2

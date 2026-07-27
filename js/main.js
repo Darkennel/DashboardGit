@@ -33,10 +33,9 @@ function onEachSuiviFeature(feature, layer) {
 const selectCommune = document.getElementById("commune-select");
 const selectPeriode = document.getElementById("periode-select");
 const btnReset = document.getElementById("btn-reset");
+const selectMode = document.getElementById("mode-select");
 
 let styleActuel = styleProductionLgt; 
-
-document.getElementById("communes-count").textContent = communesLayer.getLayers().length;
 
 // 2. Remplissage du sélecteur des communes
 const communes = [];
@@ -149,32 +148,59 @@ function mettreAJourLegende(styleChoisi) {
 
 // 5. Fonction principale de filtrage, zoom et popups
 function appliquerFiltres() {
+  const modeActif = selectMode.value;
   const communeChoisie = selectCommune.value;
   const periodeChoisie = selectPeriode.value;
   const communeNorm = normaliserTexte(communeChoisie);
 
-  const featuresFiltrees = suiviConstru.features.filter(feature => {
-    const p = feature.properties;
-    const matchCommune = !communeChoisie || normaliserTexte(p.Commune) === communeNorm;
-    const matchPeriode = testerPeriode(p.DateLivrai, periodeChoisie);
-    
-    return matchCommune && matchPeriode;
-  });
-
   suiviLayer.clearLayers();
-  
-  // Rechargement des entités et ré-association des popups
-  suiviLayer.addData(featuresFiltrees);
-  suiviLayer.eachLayer(layer => {
-    if (layer.feature) {
-      onEachSuiviFeature(layer.feature, layer);
-    }
-  });
+  consoLayer.clearLayers();
 
-  suiviLayer.setStyle(styleActuel);
+  if (modeActif === "suivi") {
+    // Mode SUIVI CONSTRUCTION
+    const featuresFiltrees = suiviConstru.features.filter(feature => {
+      const p = feature.properties;
+      const matchCommune = !communeChoisie || normaliserTexte(p.Commune) === communeNorm;
+      const matchPeriode = testerPeriode(p.DateLivrai, periodeChoisie);
+      return matchCommune && matchPeriode;
+    });
 
-  mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
+    document.getElementById("entites-count").textContent = featuresFiltrees.length.toLocaleString("fr-FR");
 
+    suiviLayer.addData(featuresFiltrees);
+    suiviLayer.eachLayer(layer => {
+      if (layer.feature) onEachSuiviFeature(layer.feature, layer);
+    });
+
+    mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
+    suiviLayer.setStyle(styleActuel);
+    suiviLayer.bringToFront();
+
+  } else if (modeActif === "conso") {
+    // Mode CONSOMMATION (ENAF)
+    const sourceEnaf = typeof enafData !== 'undefined' ? enafData.features : [];
+
+    const featuresFiltrees = sourceEnaf.filter(feature => {
+      const p = feature.properties;
+      const matchCommune = !communeChoisie || normaliserTexte(p.lib_com || p.Commune) === communeNorm;
+      return matchCommune; // Note: Si ENAF n'a pas de champ DateLivrai, on ne filtre que par commune
+    });
+
+    document.getElementById("entites-count").textContent = featuresFiltrees.length.toLocaleString("fr-FR");
+
+    consoLayer.addData(featuresFiltrees);
+    consoLayer.eachLayer(layer => {
+      if (layer.feature) {
+        layer.bindPopup(genererPopupEnaf(layer.feature.properties));
+      }
+    });
+
+    mettreAJourTableauConso(featuresFiltrees, communeChoisie);
+    consoLayer.setStyle(styleConsommation);
+    consoLayer.bringToFront();
+  }
+
+  // Zoom et mise en valeur de la commune
   communesLayer.eachLayer(layer => layer.setStyle(styleNormal));
 
   if (communeChoisie !== "") {
@@ -190,8 +216,7 @@ function appliquerFiltres() {
     if (communeTrouvee) {
       communeTrouvee.setStyle(styleSelection);
       communeTrouvee.bringToFront();
-      suiviLayer.bringToFront();
-
+      
       const bounds = communeTrouvee.getBounds();
       if (bounds.isValid()) {
         map.fitBounds(bounds, { padding: [20, 20], maxZoom: 16 });
@@ -204,10 +229,42 @@ function appliquerFiltres() {
   }
 }
 
+function changerModeAnalyse() {
+  const modeActif = selectMode.value;
+
+  if (modeActif === "suivi") {
+    // 1. Gestion des couches sur la carte
+    if (map.hasLayer(consoLayer)) map.removeLayer(consoLayer);
+    if (!map.hasLayer(suiviLayer)) map.addLayer(suiviLayer);
+
+    // 2. Affichage des panneaux dans la sidebar
+    document.getElementById("section-suivi").style.display = "block";
+    document.getElementById("section-conso").style.display = "none";
+
+    // 3. Mise à jour de la légende et du style si besoin
+    mettreAJourLegende("typologie");
+
+  } else if (modeActif === "conso") {
+    // 1. Gestion des couches
+    if (map.hasLayer(suiviLayer)) map.removeLayer(suiviLayer);
+    if (!map.hasLayer(consoLayer)) map.addLayer(consoLayer);
+
+    // 2. Affichage des panneaux
+    document.getElementById("section-suivi").style.display = "none";
+    document.getElementById("section-conso").style.display = "block";
+
+    // 3. Légende spécifique au mode consommation
+    // (ex: mettreAJourLegende("conso");)
+  }
+
+  // Ré-appliquer les filtres (commune/période) sur le nouveau mode
+  appliquerFiltres();
+}
+
 // 6. Écouteurs d'événements
 selectCommune.addEventListener("change", appliquerFiltres);
 selectPeriode.addEventListener("change", appliquerFiltres);
-
+selectMode.addEventListener("change", changerModeAnalyse);
 btnReset.addEventListener("click", function() {
   selectCommune.value = "";
   selectPeriode.value = "";

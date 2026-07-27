@@ -9,12 +9,80 @@ const hot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
   attribution: '&copy; OpenStreetMap contributors'
 });
 
+const EsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+});
+
 osm.addTo(map);
 
-L.control.layers(
-  { "OpenStreetMap": osm, "OpenStreetMap HOT": hot },
+
+
+const layerControl = L.control.layers(
+  { 
+    "OpenStreetMap": osm, 
+    "OpenStreetMap HOT": hot, 
+    "Esri World Imagery": EsriImagery 
+  },
   {}
 ).addTo(map);
+
+function mettreAJourDateEsri() {
+  // Si la couche Esri n'est pas active sur la carte, inutile d'interroger l'API
+  if (!map.hasLayer(EsriImagery)) return;
+
+  const center = map.getCenter();
+  const bounds = map.getBounds();
+  const size = map.getSize();
+
+  const metadataUrl = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/identify?` +
+    `geometry=${center.lng},${center.lat}` +
+    `&geometryType=esriGeometryPoint` +
+    `&sr=4326` +
+    `&layers=all` +
+    `&tolerance=2` +
+    `&mapExtent=${bounds.toBBoxString()}` +
+    `&imageDisplay=${size.x},${size.y},96` +
+    `&f=json`;
+
+  fetch(metadataUrl)
+    .then(res => res.json())
+    .then(data => {
+      if (data.results && data.results.length > 0) {
+        const attributes = data.results[0].attributes;
+        const datePriseDeVue = attributes.NICE_DATE || attributes.DATE || "";
+        
+        // Cibler directement le span du sélecteur de couches Leaflet
+        const labels = document.querySelectorAll('.leaflet-control-layers-base label');
+        labels.forEach(label => {
+          if (label.textContent.includes("Esri World Imagery")) {
+            const span = label.querySelector('span');
+            if (span) {
+              // Reconstruire proprement le contenu du span : Input Radio + Nouveau Texte
+              const input = span.querySelector('input');
+              const texteFormatted = datePriseDeVue 
+                ? ` Esri World Imagery (${datePriseDeVue})` 
+                : " Esri World Imagery";
+
+              // Réinjection propre sans concaténation
+              span.innerHTML = '';
+              if (input) span.appendChild(input);
+              span.appendChild(document.createTextNode(texteFormatted));
+            }
+          }
+        });
+      }
+    })
+    .catch(err => console.error("Erreur métadonnées Esri :", err));
+}
+
+// Écouteurs pour mettre à jour la date au déplacement ou changement de couche
+map.on('moveend', mettreAJourDateEsri);
+
+map.on('baselayerchange', function(e) {
+  if (e.layer === EsriImagery) {
+    mettreAJourDateEsri();
+  }
+});
 
 // Styles
 const styleNormal = {
@@ -153,7 +221,18 @@ legendDestination.onAdd = function () {
   div.innerHTML = html;
   return div;
 };
-
+// ==========================================
+// 3. STYLE CONSOMMATION (ENAF)
+// ==========================================
+function styleConsommation(feature) {
+  // Couleur verte pour les espaces consommés
+  return {
+    color: "#1e8449",
+    weight: 1,
+    fillColor: "#2ecc71",
+    fillOpacity: 0.5
+  };
+}
 // ==========================================
 // SÉLECTEUR DE STYLE INTÉGRÉ À LA CARTE
 // ==========================================
@@ -191,12 +270,18 @@ styleControl.onAdd = function () {
 styleControl.addTo(map);
 
 
-// Remplace la création de suiviLayer à la fin de map.js par ceci :
 const suiviLayer = L.geoJSON(suiviConstru, {
   style: styleProductionLgt
   // La gestion du click/popup sera faite dynamiquement dans main.js
-}).addTo(map);
+});
 
+
+// Couche 2 : Consommation (ex: une autre variable GeoJSON ou un style dédié)
+const consoLayer = L.geoJSON(typeof Enaf !== 'undefined' ? Enaf : null, {
+  style: styleConsommation
+});
+
+suiviLayer.addTo(map);
 // Affichage de la légende par défaut
 legendTypologie.addTo(map);
 

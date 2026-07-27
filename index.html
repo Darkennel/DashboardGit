@@ -11,61 +11,65 @@
 <body>
   <div class="dashboard">
     <div class="sidebar">
-      <div class="tenor-gif-embed" data-postid="14050115" data-share-method="host" data-aspect-ratio="2.4375" data-width="100%">
-        <a href="https://tenor.com/view/quel-nom-compliqu%C3%A9-nom-name-hard-name-oss117-gif-14050115">Quel Nom Compliqué Nom GIF</a>from 
-        <a href="https://tenor.com/search/quel+nom+compliqu%C3%A9-gifs">Quel Nom Compliqué GIFs</a>
-      </div> 
-      <script type="text/javascript" async src="https://tenor.com/embed.js"></script>
-      <h2>Suivi Conso Et Planification</h2>
-      <p>Nombre de communes : <span id="communes-count">Chargement...</span></p>
-
-      <label for="commune-select"><strong>Choisir une commune :</strong></label><br>
-      <select id="commune-select">
-          <option value="">-- Toutes les communes --</option>
-      </select>
-
-      <label for="periode-select"><strong>Choisir une période :</strong></label><br>
-      <select id="periode-select">
-          <option value="">-- Toutes les périodes --</option>
-          <option value="2009_2025">2009 - 2025</option>
-          <option value="2009_2022">2009 - 2022</option>
-          <option value="2022_2025">2022 - 2025</option>
-          <option value="2026">2026</option>
-
-      </select>
-
-      <button id="btn-reset" class="btn-reset">Réinitialiser les filtres</button>
-      <button id="btn-export-csv" class="btn-reset" style="margin-top: 10px; background-color: #27ae60;">Exporter en CSV</button>
       
-      <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Récapitulatifs logements</h3>
-      <table class="recap-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Logements</th>
-            <th>%</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Intensif</td>
-            <td id="log-intensif">0</td>
-            <td id ="part-logIntensif">0</td>
-          </tr>
-          <tr>
-            <td>ConsoEnaf</td>
-            <td id="log-enaf">0</td>
-            <td id ="part-logEnaf">0</td>
+      <h2>Suivi Conso Et Planification</h2>
+      <p>Nombre d'entités affichées : <span id="entites-count">0</span></p>
+      <div class="sidebar-section" style="margin-bottom: 20px; background: #eef4f8; padding: 10px; border-radius: 6px;">
+        <label for="mode-select"><strong>Mode d'analyse :</strong></label><br>
+        <select id="mode-select" style="width: 100%; padding: 6px; margin-top: 5px; font-weight: bold; border-color: #2b5c8f;">
+          <option value="suivi">Suivi Construction</option>
+          <option value="conso">Consommation d'Espace</option>
+        </select>
 
-          </tr>
-          <tr class="total-row">
-            <td>Total</td>
-            <td id="log-total">0</td>
-            <td>100 %</td>
-          </tr>
-        </tbody>
-      </table>
-      <table class="recap-table">
+        <div id="section-filtres" style="margin-top: 15px;">
+          <label for="commune-select"><strong>Choisir une commune :</strong></label><br>
+          <select id="commune-select" style="width: 100%;">
+            <option value="">-- Toutes les communes --</option>
+          </select>
+
+          <label for="periode-select" style="margin-top: 10px; display: inline-block;"><strong>Choisir une période :</strong></label><br>
+              <select id="periode-select" style="width: 100%;">
+                <option value="">-- Toutes les périodes --</option>
+                <option value="2009_2025">2009 - 2025</option>
+                <option value="2009_2022">2009 - 2022</option>
+                <option value="2022_2025">2022 - 2025</option>
+                <option value="2026">2026</option>
+              </select>
+          <button id="btn-reset" class="btn-reset" style="width: 100%; margin-top: 10px;">Réinitialiser les filtres</button>
+          <button id="btn-export-csv" class="btn-reset" style="width: 100%; margin-top: 5px; background-color: #27ae60;">Exporter en CSV</button>
+        </div>
+      </div>
+
+      <div id="section-suivi" class="mode-section">
+        <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Récapitulatifs logements</h3>
+        <table class="recap-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Logements</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Intensif</td>
+              <td id="log-intensif">0</td>
+              <td id ="part-logIntensif">0</td>
+            </tr>
+            <tr>
+              <td>ConsoEnaf</td>
+              <td id="log-enaf">0</td>
+              <td id ="part-logEnaf">0</td>
+
+            </tr>
+            <tr class="total-row">
+              <td>Total</td>
+              <td id="log-total">0</td>
+              <td>100 %</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="recap-table">
         <thead>
           <tr>
             <th>Type</th>
@@ -91,10 +95,10 @@
             <td id="surfARCEQUTOTAL">0</td>
           </tr>
         </tbody>
-      </table>
+        </table>
       
-      <h4 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Type Intensif</h4>
-      <table class="recap-table">
+        <h4 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Type Intensif</h4>
+        <table class="recap-table">
         <thead>
           <tr>
             <th>Type Intensif</th>
@@ -118,10 +122,10 @@
           </tbody>
 
         </thead>        
-      </table>
+        </table>
 
-      <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Indicateurs logements</h3>
-      <table class="recap-table">
+        <h3 style="margin-top: 25px; border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Indicateurs logements</h3>
+        <table class="recap-table">
         <thead>
           <tr>
             <th>Indicateur</th>
@@ -142,9 +146,29 @@
             <td id="log-IC3">0 m²</td>
           </tr>            
         </tbody>        
-      </table>
-    </div>
+        </table>
+      </div>
+      
+      <div id="section-conso" class="mode-section" style="display: none;">
+        <h3 style="border-bottom: 2px solid #2b5c8f; padding-bottom: 5px;">Récapitulatif Consommation (ENAF)</h3>
+        <table class="recap-table">
+          <thead>
+            <tr>
+              <th>Type d'espace</th>
+              <th>Surface (ha)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Espaces Naturels, Agricoles et Forestiers</td>
+              <td id="surf-enaf-ha">0 ha</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
+
+    </div>
     <div id="map"></div>
   </div>
 
@@ -154,6 +178,8 @@
   <!-- 2. Données (fichiers contenant tes variables communesData et suiviConstru) -->
   <script src="Data/CommunesSico.js"></script>
   <script src="Data/SuiviConstru.js"></script>
+  <script src="Data/Enaf__.js"></script>
+
 
   <!-- 3. Tes scripts d'application (L'ordre est important !) -->
   <script src="js/util.js"></script>

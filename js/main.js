@@ -147,6 +147,9 @@ function mettreAJourLegende(styleChoisi) {
 }
 
 // 5. Fonction principale de filtrage, zoom et popups
+// ==========================================
+// APPLICATION DES FILTRES ET MISE À JOUR
+// ==========================================
 function appliquerFiltres() {
   const modeActif = selectMode.value;
   const communeChoisie = selectCommune.value;
@@ -172,7 +175,6 @@ function appliquerFiltres() {
       if (layer.feature) onEachSuiviFeature(layer.feature, layer);
     });
 
-    mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
     suiviLayer.setStyle(styleActuel);
     suiviLayer.bringToFront();
 
@@ -182,25 +184,17 @@ function appliquerFiltres() {
 
     const featuresFiltrees = sourceEnaf.filter(feature => {
       const p = feature.properties;
-      const matchCommune = !communeChoisie || normaliserTexte(p.lib_com || p.Commune) === communeNorm;
-      return matchCommune; // Note: Si ENAF n'a pas de champ DateLivrai, on ne filtre que par commune
+      return !communeChoisie || normaliserTexte(p.lib_com || p.Commune) === communeNorm;
     });
 
     document.getElementById("entites-count").textContent = featuresFiltrees.length.toLocaleString("fr-FR");
 
     consoLayer.addData(featuresFiltrees);
-    consoLayer.eachLayer(layer => {
-      if (layer.feature) {
-        layer.bindPopup(genererPopupEnaf(layer.feature.properties));
-      }
-    });
-
-    mettreAJourTableauConso(featuresFiltrees, communeChoisie);
     consoLayer.setStyle(styleConsommation);
     consoLayer.bringToFront();
   }
 
-  // Zoom et mise en valeur de la commune
+  // Zoom et mise en valeur de la commune sélectionnée
   communesLayer.eachLayer(layer => layer.setStyle(styleNormal));
 
   if (communeChoisie !== "") {

@@ -27,6 +27,18 @@ function onEachSuiviFeature(feature, layer) {
   layer.bindPopup(htmlContent);
 }
 
+function onEachEnafFeature(feature, layer) {
+  const p = feature.properties || {};
+  const surfHa = (Number(p.Shape_Area) / 10000).toFixed(2);
+  layer.bindPopup(`
+    <div style="font-family: Arial, sans-serif; font-size: 13px;">
+      <h4 style="margin:0 0 6px 0; color:#2b5c8f;">${p.lib_com || "Commune"}</h4>
+      <b>ENAF 2022 :</b> ${p.ENAF2022 || "-"}<br>
+      <b>Surface :</b> ${surfHa} ha
+    </div>
+  `);
+}
+
 // ==========================================
 // 1. Déclarations DOM et variables
 // ==========================================
@@ -134,13 +146,27 @@ function mettreAJourTableau(features, communeChoisie = "", periodeChoisie = "") 
   document.getElementById("log-IC3").textContent = `${Math.round(densiteHectare).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} lgt/ha`;
 }
 
+// 3bis. Mettre à jour le tableau récapitulatif du mode Consommation (ENAF)
+function mettreAJourTableauConso(features) {
+  const surfaceEnaf = features
+    .filter(f => normaliserTexte(f.properties.ENAF2022) === "oui")
+    .reduce((acc, f) => acc + (Number(f.properties.Shape_Area) || 0), 0);
+
+  const ha = surfaceEnaf / 10000;
+  document.getElementById("surf-enaf-ha").textContent =
+    `${ha.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ha`;
+}
+
 // 4. Gestion unique de l'affichage des légendes
 function mettreAJourLegende(styleChoisi) {
   if (map.hasLayer(legendTypologie)) map.removeControl(legendTypologie);
   if (map.hasLayer(legendDestination)) map.removeControl(legendDestination);
+  if (map.hasLayer(legendConso)) map.removeControl(legendConso);
 
   if (styleChoisi === "destination") {
     legendDestination.addTo(map);
+  } else if (styleChoisi === "conso") {
+    legendConso.addTo(map);
   } else {
     legendTypologie.addTo(map);
   }
@@ -178,20 +204,28 @@ function appliquerFiltres() {
     suiviLayer.setStyle(styleActuel);
     suiviLayer.bringToFront();
 
+    mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
+
   } else if (modeActif === "conso") {
     // Mode CONSOMMATION (ENAF)
-    const sourceEnaf = typeof enafData !== 'undefined' ? enafData.features : [];
+    const sourceEnaf = typeof Enaf !== 'undefined' ? Enaf.features : [];
 
     const featuresFiltrees = sourceEnaf.filter(feature => {
       const p = feature.properties;
-      return !communeChoisie || normaliserTexte(p.lib_com || p.Commune) === communeNorm;
+      // Filtre uniquement sur la commune (lib_com), la période n'a pas d'impact
+      return !communeChoisie || normaliserTexte(p.lib_com) === communeNorm;
     });
 
     document.getElementById("entites-count").textContent = featuresFiltrees.length.toLocaleString("fr-FR");
 
     consoLayer.addData(featuresFiltrees);
+    consoLayer.eachLayer(layer => {
+      if (layer.feature) onEachEnafFeature(layer.feature, layer);
+    });
     consoLayer.setStyle(styleConsommation);
     consoLayer.bringToFront();
+
+    mettreAJourTableauConso(featuresFiltrees);
   }
 
   // Zoom et mise en valeur de la commune sélectionnée
@@ -248,7 +282,7 @@ function changerModeAnalyse() {
     document.getElementById("section-conso").style.display = "block";
 
     // 3. Légende spécifique au mode consommation
-    // (ex: mettreAJourLegende("conso");)
+    mettreAJourLegende("conso");
   }
 
   // Ré-appliquer les filtres (commune/période) sur le nouveau mode

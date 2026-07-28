@@ -169,6 +169,23 @@ legendTypologie.onAdd = function () {
   return div;
 };
 
+const legendConso = L.control({ position: 'bottomright' });
+legendConso.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.cssText = 'background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); font-size: 12px;';
+  div.innerHTML = `
+    <h4 style="margin:0 0 8px 0; font-size:13px; border-bottom:1px solid #ccc; padding-bottom:3px;">Enaf</h4>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+      <span>Oui</span>
+      <i style="background:#2ecc71;width:18px;height:18px;display:inline-block;border-radius:2px;"></i>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+      <span>Non</span>
+      <i style="background:#bdc3c7;width:18px;height:18px;display:inline-block;border-radius:2px;"></i>
+    </div>`;
+  return div;
+};
+
 // ==========================================
 // 2. STYLE DESTINATION
 // ==========================================
@@ -225,13 +242,15 @@ legendDestination.onAdd = function () {
 // 3. STYLE CONSOMMATION (ENAF)
 // ==========================================
 function styleConsommation(feature) {
-  // Couleur verte pour les espaces consommés
-  return {
-    color: "#1e8449",
-    weight: 1,
-    fillColor: "#2ecc71",
-    fillOpacity: 0.5
-  };
+  const props = feature.properties || {};
+  const enaf2022 = normaliserTexte(props.ENAF2022);
+
+  if (enaf2022 === "oui") {
+    // Espace déjà consommé en 2022
+    return { color: "#1e8449", weight: 1, fillColor: "#2ecc71", fillOpacity: 0.55 };
+  }
+  // Espace non consommé (ENAF encore présent)
+  return { color: "#7f8c8d", weight: 1, fillColor: "#bdc3c7", fillOpacity: 0.3 };
 }
 // ==========================================
 // SÉLECTEUR DE STYLE INTÉGRÉ À LA CARTE

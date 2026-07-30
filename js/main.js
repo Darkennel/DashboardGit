@@ -29,11 +29,19 @@ function onEachSuiviFeature(feature, layer) {
 
 function onEachEnafFeature(feature, layer) {
   const p = feature.properties || {};
+
+  // Champ ENAF actuellement choisi dans le sélecteur dédié (ENAF2022, ENAF2019, ...)
+  const selectEnaf = document.getElementById("periode-enaf-select");
+  const champAnnee = selectEnaf && selectEnaf.value ? selectEnaf.value : "ENAF2022";
+
+  const valEnaf = p[champAnnee] || "-";
   const surfHa = (Number(p.Shape_Area) / 10000).toFixed(2);
+  const champLabel = champAnnee.replace("ENAF", "ENAF ");
+
   layer.bindPopup(`
     <div style="font-family: Arial, sans-serif; font-size: 13px;">
-      <h4 style="margin:0 0 6px 0; color:#2b5c8f;">${p.lib_com || "Commune"}</h4>
-      <b>ENAF 2022 :</b> ${p.ENAF2022 || "-"}<br>
+      <h4 style="margin:0 0 6px 0; color:#2b5c8f;">${p.lib_com || p.Commune || "Commune"}</h4>
+      <b>${champLabel} :</b> ${valEnaf}<br>
       <b>Surface :</b> ${surfHa} ha
     </div>
   `);
@@ -146,15 +154,20 @@ function mettreAJourTableau(features, communeChoisie = "", periodeChoisie = "") 
   document.getElementById("log-IC3").textContent = `${Math.round(densiteHectare).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} lgt/ha`;
 }
 
-// 3bis. Mettre à jour le tableau récapitulatif du mode Consommation (ENAF)
-function mettreAJourTableauConso(features) {
-  const surfaceEnaf = features
-    .filter(f => normaliserTexte(f.properties.ENAF2022) === "oui")
+// 2. Calcul du tableau récapitulatif Consommation (ENAF)
+function mettreAJourTableauConso(features, champAnnee = "ENAF2022") {
+  // Somme des surfaces où le champ ENAF sélectionné vaut "oui"
+  const surfaceEnafOui = features
+    .filter(f => normaliserTexte(f.properties[champAnnee]) === "oui")
     .reduce((acc, f) => acc + (Number(f.properties.Shape_Area) || 0), 0);
 
-  const ha = surfaceEnaf / 10000;
-  document.getElementById("surf-enaf-ha").textContent =
-    `${ha.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ha`;
+  // Conversion en hectares (1 ha = 10 000 m²)
+  const surfaceOuiHa = surfaceEnafOui / 10000;
+
+  const elEnafHa = document.getElementById("surf-enaf-ha");
+  if (elEnafHa) {
+    elEnafHa.textContent = `${surfaceOuiHa.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ha`;
+  }
 }
 
 // 4. Gestion unique de l'affichage des légendes
@@ -207,27 +220,43 @@ function appliquerFiltres() {
     mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
 
   } else if (modeActif === "conso") {
-    // Mode CONSOMMATION (ENAF)
-    const sourceEnaf = typeof Enaf !== 'undefined' ? Enaf.features : [];
+    const sourceEnaf = (typeof Enaf !== 'undefined' && Enaf && Array.isArray(Enaf.features))
+      ? Enaf.features
+      : [];
 
+    // Récupération du champ ENAF choisi (ex: ENAF2022, ENAF2019, ...)
+    const selectEnaf = document.getElementById("periode-enaf-select");
+    const champAnnee = selectEnaf ? selectEnaf.value : "ENAF2022";
+
+    // Filtrage dynamique : commune choisie ET champ ENAF sélectionné = "oui"
     const featuresFiltrees = sourceEnaf.filter(feature => {
+      if (!feature || !feature.properties) return false;
       const p = feature.properties;
-      // Filtre uniquement sur la commune (lib_com), la période n'a pas d'impact
-      return !communeChoisie || normaliserTexte(p.lib_com) === communeNorm;
+
+      const nomCommune = p.lib_com || p.LIB_COM || p.Commune || p.COMMUNE || p.nom_com || "";
+      const matchCommune = !communeChoisie || normaliserTexte(nomCommune) === communeNorm;
+      const matchEnaf = normaliserTexte(p[champAnnee]) === "oui";
+
+      return matchCommune && matchEnaf;
     });
 
-    document.getElementById("entites-count").textContent = featuresFiltrees.length.toLocaleString("fr-FR");
+    // Mise à jour de la carte
+    consoLayer.clearLayers();
+    if (featuresFiltrees.length > 0) {
+      consoLayer.addData(featuresFiltrees);
+      consoLayer.eachLayer(layer => {
+        if (layer.feature) onEachEnafFeature(layer.feature, layer);
+      });
+      consoLayer.setStyle(styleConsommation);
+      consoLayer.bringToFront();
+    }
 
-    consoLayer.addData(featuresFiltrees);
-    consoLayer.eachLayer(layer => {
-      if (layer.feature) onEachEnafFeature(layer.feature, layer);
-    });
-    consoLayer.setStyle(styleConsommation);
-    consoLayer.bringToFront();
+    const elCount = document.getElementById("entites-count");
+    if (elCount) elCount.textContent = featuresFiltrees.length.toLocaleString("fr-FR");
 
-    mettreAJourTableauConso(featuresFiltrees);
+    mettreAJourLegende("conso");
+    mettreAJourTableauConso(featuresFiltrees, champAnnee);
   }
-
   // Zoom et mise en valeur de la commune sélectionnée
   communesLayer.eachLayer(layer => layer.setStyle(styleNormal));
 
@@ -271,6 +300,7 @@ function changerModeAnalyse() {
 
     // 3. Mise à jour de la légende et du style si besoin
     mettreAJourLegende("typologie");
+    basculerSelecteursPeriode("suivi");
 
   } else if (modeActif === "conso") {
     // 1. Gestion des couches
@@ -283,6 +313,7 @@ function changerModeAnalyse() {
 
     // 3. Légende spécifique au mode consommation
     mettreAJourLegende("conso");
+    basculerSelecteursPeriode("conso");
   }
 
   // Ré-appliquer les filtres (commune/période) sur le nouveau mode
@@ -316,6 +347,7 @@ document.addEventListener("change", function (e) {
 
 // Initialisations au chargement
 mettreAJourLegende("typologie");
+basculerSelecteursPeriode(selectMode.value);
 appliquerFiltres();
 
 // Export CSV
@@ -364,3 +396,25 @@ function exporterTableauxCSV() {
 }
 
 document.getElementById("btn-export-csv").addEventListener("click", exporterTableauxCSV);
+
+// Changer le champ ENAF affiché (2022, 2019, ...) réapplique immédiatement filtres, style, popups, légende et tableau
+document.getElementById("periode-enaf-select")?.addEventListener("change", appliquerFiltres);
+
+function basculerSelecteursPeriode(mode) {
+  const selectClassique = document.getElementById("periode-select");
+  const labelClassique = document.getElementById("label-periode-classique");
+  const selectEnaf = document.getElementById("periode-enaf-select");
+  const labelEnaf = document.getElementById("label-periode-enaf");
+
+  if (mode === "conso") {
+    if (selectClassique) selectClassique.style.display = "none";
+    if (labelClassique) labelClassique.style.display = "none";
+    if (selectEnaf) selectEnaf.style.display = "block";
+    if (labelEnaf) labelEnaf.style.display = "block";
+  } else {
+    if (selectClassique) selectClassique.style.display = "block";
+    if (labelClassique) labelClassique.style.display = "inline-block";
+    if (selectEnaf) selectEnaf.style.display = "none";
+    if (labelEnaf) labelEnaf.style.display = "none";
+  }
+}

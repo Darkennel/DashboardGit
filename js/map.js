@@ -299,7 +299,7 @@ const suiviLayer = L.geoJSON(suiviConstru, {
 
 
 // Couche 2 : Consommation (ex: une autre variable GeoJSON ou un style dédié)
-const consoLayer = L.geoJSON(typeof Enaf !== 'undefined' ? Enaf : null, {
+const consoLayer = L.geoJSON(typeof Enaf2022 !== 'undefined' ? Enaf2022 : null, {
   style: styleConsommation
 });
 

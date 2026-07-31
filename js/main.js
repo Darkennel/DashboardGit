@@ -219,44 +219,54 @@ function appliquerFiltres() {
 
     mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
 
-  } else if (modeActif === "conso") {
-    const sourceEnaf = (typeof Enaf !== 'undefined' && Enaf && Array.isArray(Enaf.features))
-      ? Enaf.features
-      : [];
+} else if (modeActif === "conso") {
+  const sourceEnaf = (typeof Enaf2022 !== 'undefined' && Enaf2022 && Array.isArray(Enaf2022.features))
+    ? Enaf2022.features
+    : [];
 
-    // Récupération du champ ENAF choisi (ex: ENAF2022, ENAF2019, ...)
-    const selectEnaf = document.getElementById("periode-enaf-select");
-    const champAnnee = selectEnaf ? selectEnaf.value : "ENAF2022";
+  // Filtrage : commune choisie ET EspNAF22 === "ENAF" (indépendamment du sélecteur)
+  const featuresFiltrees = sourceEnaf.filter(feature => {
+    if (!feature || !feature.properties) return false;
+    const p = feature.properties;
 
-    // Filtrage dynamique : commune choisie ET champ ENAF sélectionné = "oui"
-    const featuresFiltrees = sourceEnaf.filter(feature => {
-      if (!feature || !feature.properties) return false;
-      const p = feature.properties;
+    // 1. Filtre Commune (__NOMCOM en priorité)
+    const nomCommune = p.__NOMCOM || p.lib_com || p.LIB_COM || p.Commune || p.COMMUNE || p.nom_com || "";
+    const matchCommune = !communeChoisie || normaliserTexte(nomCommune) === communeNorm;
 
-      const nomCommune = p.lib_com || p.LIB_COM || p.Commune || p.COMMUNE || p.nom_com || "";
-      const matchCommune = !communeChoisie || normaliserTexte(nomCommune) === communeNorm;
-      const matchEnaf = normaliserTexte(p[champAnnee]) === "oui";
+    // 2. Filtre EspNAF22 fixe à "ENAF"
+    const matchEnaf = p.EspNAF22 === "ENAF";
 
-      return matchCommune && matchEnaf;
+    return matchCommune && matchEnaf;
+  });
+
+  // Mise à jour de la carte Leaflet
+  consoLayer.clearLayers();
+
+  if (featuresFiltrees.length > 0) {
+    consoLayer.addData({
+      type: "FeatureCollection",
+      features: featuresFiltrees
     });
 
-    // Mise à jour de la carte
-    consoLayer.clearLayers();
-    if (featuresFiltrees.length > 0) {
-      consoLayer.addData(featuresFiltrees);
-      consoLayer.eachLayer(layer => {
-        if (layer.feature) onEachEnafFeature(layer.feature, layer);
-      });
-      consoLayer.setStyle(styleConsommation);
-      consoLayer.bringToFront();
-    }
+    consoLayer.eachLayer(layer => {
+      if (layer.feature) onEachEnafFeature(layer.feature, layer);
+    });
 
-    const elCount = document.getElementById("entites-count");
-    if (elCount) elCount.textContent = featuresFiltrees.length.toLocaleString("fr-FR");
-
-    mettreAJourLegende("conso");
-    mettreAJourTableauConso(featuresFiltrees, champAnnee);
+    consoLayer.setStyle(styleConsommation);
+    consoLayer.bringToFront();
   }
+
+  // Compteur d'entités
+  const elCount = document.getElementById("entites-count");
+  if (elCount) elCount.textContent = featuresFiltrees.length.toLocaleString("fr-FR");
+
+  // Récupération éventuelle de la valeur du sélecteur si besoin pour le tableau/légende
+  const selectEnaf = document.getElementById("periode-enaf-select");
+  const champAnnee = selectEnaf ? selectEnaf.value : "EspNAF22";
+
+  mettreAJourLegende("conso");
+  mettreAJourTableauConso(featuresFiltrees, champAnnee);
+}
   // Zoom et mise en valeur de la commune sélectionnée
   communesLayer.eachLayer(layer => layer.setStyle(styleNormal));
 
@@ -418,3 +428,5 @@ function basculerSelecteursPeriode(mode) {
     if (labelEnaf) labelEnaf.style.display = "none";
   }
 }
+
+

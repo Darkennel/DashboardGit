@@ -17,7 +17,9 @@ function genererContenuPopup(properties) {
       <b>État :</b> ${p.ETAT || "-"}<br>
       <b>Urbanisation :</b> ${p.Urbanisati || "-"}<br>
       <b>Type Urbanisation :</b> ${p.Type2Urban || "-"}<br>
-      <b>Destination :</b> ${p.Destinatio || "-"}
+      <b>Destination :</b> ${p.Destinatio || "-"}<br>
+      <b>Nom de l'opération :</b> ${p.Nom_Operat || "-"}
+
     </div>
   `;
 }
@@ -155,10 +157,13 @@ function mettreAJourTableau(features, communeChoisie = "", periodeChoisie = "") 
 }
 
 // 2. Calcul du tableau récapitulatif Consommation (ENAF)
-function mettreAJourTableauConso(features, champAnnee = "ENAF2022") {
-  // Somme des surfaces où le champ ENAF sélectionné vaut "oui"
+function mettreAJourTableauConso(features, champAnnee = "EspNAF22") {
+  // Somme des surfaces où le champ vaut "ENAF" ou "oui"
   const surfaceEnafOui = features
-    .filter(f => normaliserTexte(f.properties[champAnnee]) === "oui")
+    .filter(f => {
+      const val = normaliserTexte(f.properties[champAnnee]);
+      return val === "enaf" || val === "oui" || val === "1";
+    })
     .reduce((acc, f) => acc + (Number(f.properties.Shape_Area) || 0), 0);
 
   // Conversion en hectares (1 ha = 10 000 m²)
@@ -220,27 +225,44 @@ function appliquerFiltres() {
     mettreAJourTableau(featuresFiltrees, communeChoisie, periodeChoisie);
 
 } else if (modeActif === "conso") {
-  const sourceEnaf = (typeof Enaf2022 !== 'undefined' && Enaf2022 && Array.isArray(Enaf2022.features))
-    ? Enaf2022.features
-    : [];
+  // 1. Récupération de la période sélectionnée (ENAF2022, ENAF2009, etc.)
+  const selectEnaf = document.getElementById("periode-enaf-select");
+  const valeurPeriode = selectEnaf ? selectEnaf.value : "ENAF2022";
 
-  // Filtrage : commune choisie ET EspNAF22 === "ENAF" (indépendamment du sélecteur)
+  // 2. Sélection dynamique de la source de données GeoJSON
+  let sourceEnaf = [];
+  let champEnaf = "EspNAF22"; // Champ par défaut pour 2022
+
+  if (valeurPeriode === "ENAF2009") {
+    if (typeof Enaf2009 !== 'undefined' && Enaf2009 && Array.isArray(Enaf2009.features)) {
+      sourceEnaf = Enaf2009.features;
+    }
+    champEnaf = "EspNAF09"; // Remplacez par le nom exact du champ dans Enaf2009 (ex: EspNAF09 ou ENAF2009)
+  } else {
+    if (typeof Enaf2022 !== 'undefined' && Enaf2022 && Array.isArray(Enaf2022.features)) {
+      sourceEnaf = Enaf2022.features;
+    }
+    champEnaf = "EspNAF22";
+  }
+
+  // 3. Filtrage dynamique (Commune + Valeur ENAF)
   const featuresFiltrees = sourceEnaf.filter(feature => {
     if (!feature || !feature.properties) return false;
     const p = feature.properties;
 
-    // 1. Filtre Commune (__NOMCOM en priorité)
+    // Filtre Commune
     const nomCommune = p.__NOMCOM || p.lib_com || p.LIB_COM || p.Commune || p.COMMUNE || p.nom_com || "";
     const matchCommune = !communeChoisie || normaliserTexte(nomCommune) === communeNorm;
 
-    // 2. Filtre EspNAF22 fixe à "ENAF"
-    const matchEnaf = p.EspNAF22 === "ENAF";
+    // Filtre ENAF tolérant (vérifie si la valeur vaut "ENAF", "oui" ou "1")
+    const valProp = normaliserTexte(p[champEnaf] || p[valeurPeriode]);
+    const matchEnaf = valProp === "enaf" || valProp === "oui" || valProp === "1";
 
     return matchCommune && matchEnaf;
   });
 
   // Mise à jour de la carte Leaflet
-  consoLayer.clearLayers();
+consoLayer.clearLayers();
 
   if (featuresFiltrees.length > 0) {
     consoLayer.addData({
@@ -256,16 +278,12 @@ function appliquerFiltres() {
     consoLayer.bringToFront();
   }
 
-  // Compteur d'entités
+  // 5. Compteur et Mises à jour secondaires
   const elCount = document.getElementById("entites-count");
   if (elCount) elCount.textContent = featuresFiltrees.length.toLocaleString("fr-FR");
 
-  // Récupération éventuelle de la valeur du sélecteur si besoin pour le tableau/légende
-  const selectEnaf = document.getElementById("periode-enaf-select");
-  const champAnnee = selectEnaf ? selectEnaf.value : "EspNAF22";
-
   mettreAJourLegende("conso");
-  mettreAJourTableauConso(featuresFiltrees, champAnnee);
+  mettreAJourTableauConso(featuresFiltrees, champEnaf);
 }
   // Zoom et mise en valeur de la commune sélectionnée
   communesLayer.eachLayer(layer => layer.setStyle(styleNormal));

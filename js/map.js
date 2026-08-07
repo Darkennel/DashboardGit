@@ -303,6 +303,9 @@ const consoLayer = L.geoJSON(typeof Enaf2022 !== 'undefined' ? Enaf2022 : null, 
   style: styleConsommation
 });
 
+const consoLayer2009 = L.geoJSON(typeof Enaf2009 !== 'undefined' ? Enaf2009 : null, {
+  style: styleConsommation
+});
 suiviLayer.addTo(map);
 // Affichage de la légende par défaut
 legendTypologie.addTo(map);

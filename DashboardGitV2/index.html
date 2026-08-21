@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observatoire du Foncier - SICOVAL</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Mon style perso -->
+  <link rel="stylesheet" href="Style.css" />
+</head>
+<body>
+
+  <div id="app-container" style="display: flex; height: 100vh;">
+    
+    <!-- PANNEAU LATÉRAL (SIDEBAR) -->
+    <div id="sidebar">
+
+      <div class="form-group">
+        <label for="theme-select">Mode d'analyse :</label>
+        <select id="theme-select"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="commune-select">Commune :</label>
+        <select id="commune-select">
+          <option value="">-- SICOVAL (Ensemble) --</option>
+        </select>
+      </div>
+      <div id="wrapper-periode" class="form-group">
+        <label for="periode-select">Choisir une période :</label>
+        <select id="periode-select"></select>
+      </div>
+
+      <div id="wrapper-destination" class="form-group">
+        <label for="destination-select">Destination :</label>
+        <select id="destination-select">
+          <option value="">Toutes les destinations</option>
+          <option value="Habitat">Habitation</option>
+          <option value="ACT">Activités</option>
+          <option value="EQU">Equipements</option>
+        </select>
+      </div>
+
+      <button id="btn-reset">Réinitialiser les filtres</button>
+      <button id="btn-export">Exporter en CSV</button>
+
+      <div style="font-size: 0.85em; color: #555; margin: 10px 0;">
+        Entités affichées : <strong id="entites-count">0</strong>
+      </div>
+      <div id="sidebar-recap-container">
+        <!-- Contenu du panneau latéral -->
+      </div>
+    </div>
+
+    <!-- CARTE LEAFLET -->
+    <div id="map" style="flex: 1; height: 100%;"></div>
+
+  </div>
+
+  <!-- INCLUSION DES SCRIPTS JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- 1. Données GeoJSON (fichiers de données) -->
+  <script src="data/Enaf2022.js"></script>
+  <script src="data/ConsoEnaf0922.js"></script>
+  <script src="data/Sicoval_SCEP_vf.js"></script>
+  <script src="data/CommunesSico.js"></script>
+  <!-- <script src="data/EnafPlanifieeData.js"></script>
+  <script src="data/PotentielDensifData.js"></script> -->
+
+  <!-- 2. Scripts applicatifs (L'ordre est important) -->
+  <script src="js/util.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/calcul.js"></script>
+  <script src="js/themesConfig.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+</html>

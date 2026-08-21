@@ -1,0 +1,103 @@
+/* Panneau latéral */
+#sidebar {
+  width: 320px;
+  background-color: #f0f2f5;
+  font-family: Arial, sans-serif;
+  color: #333;
+  padding: 15px;
+  box-sizing: border-box;
+}
+
+/* Libellés des filtres */
+#sidebar label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #111;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Sélecteurs */
+#sidebar select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #a6a6a6;
+  border-radius: 3px;
+  background-color: #ffffff;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* Boutons */
+#btn-reset {
+  width: 100%;
+  padding: 7px;
+  background-color: #ffffff;
+  color: #2b5c8f;
+  border: 1px solid #2b5c8f;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+#btn-export {
+  width: 100%;
+  padding: 8px;
+  background-color: #27ae60;
+  color: #ffffff;
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 15px;
+}
+
+/* Titres de section */
+#sidebar h3 {
+  font-size: 15px;
+  color: #111;
+  margin: 15px 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #2b5c8f;
+}
+
+/* Tableaux récapitulatifs style capture */
+.table-recap {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 15px;
+  font-size: 12px;
+}
+
+.table-recap th {
+  background-color: #2b5c8f;
+  color: #ffffff;
+  padding: 6px 8px;
+  text-align: right;
+  font-weight: bold;
+}
+
+.table-recap th:first-child {
+  text-align: left;
+}
+
+.table-recap td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: right;
+  background-color: #ffffff;
+}
+
+.table-recap td:first-child {
+  text-align: left;
+  font-weight: bold;
+}
+
+.table-recap tr.total-row td {
+  font-weight: bold;
+  background-color: #f8f9fa;
+  border-top: 1px solid #ccc;
+}

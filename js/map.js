@@ -326,10 +326,7 @@ function genererContenuPopup(properties) {
 // ==========================================
 // EXPORTER LA CARTE EN IMAGE
 // ==========================================
-
 function exporterCarteSVG() {
-  // 1. Récupération des couches
-  const coucheCommunes = window.coucheCommunes; // Référence à votre couche Leaflet (GeoJSON) des communes
   const paneDonnees = map.getPane('paneDonneesActives')?.querySelector('svg');
   const paneCommunes = map.getPane('paneCommunes')?.querySelector('svg');
   const legendElement = document.querySelector('.info.legend');
@@ -339,7 +336,7 @@ function exporterCarteSVG() {
     return;
   }
 
-  // 2. Fonction principale d'extraction SVG une fois le cadrage ajusté
+  // Fonction générant et téléchargeant le fichier SVG
   const genererSVG = () => {
     const width = map.getSize().x;
     const height = map.getSize().y;
@@ -382,7 +379,7 @@ function exporterCarteSVG() {
     injecterCoucheSvg(svgCommunesFraiches);
     injecterCoucheSvg(svgDonneesFraiches);
 
-    // Intégration de la légende avec espace garanti
+    // Intégration de la légende
     if (legendElement) {
       const legendWidth = legendElement.offsetWidth || 240;
       const legendHeight = legendElement.offsetHeight || 160;
@@ -422,23 +419,43 @@ function exporterCarteSVG() {
     URL.revokeObjectURL(url);
   };
 
-  // 3. Ajustement du cadrage (Zoom & Marge/Padding) sur les limites de la commune
-  if (coucheCommunes && typeof coucheCommunes.getBounds === 'function') {
-    const bounds = coucheCommunes.getBounds();
-    
-    // fitBounds avec marge personnalisée :
-    // - paddingBottomRight laisse plus d'espace en bas à droite pour la légende
-    // - paddingTopLeft laisse une marge autour des contours supérieurs
-    map.fitBounds(bounds, {
-      paddingTopLeft: [50, 50],
-      paddingBottomRight: [260, 180], // Marge augmentée en bas à droite pour réserver la place à la légende
+  // 1. Récupération de la commune sélectionnée
+  const communeNorm = normaliserTexte(document.getElementById("commune-select")?.value);
+  let targetBounds = null;
+
+  // 2. Recherche des limites (bounds) de la commune sélectionnée ou globales
+  if (communeNorm && coucheFondCommunes) {
+    coucheFondCommunes.eachLayer(layer => {
+      const props = layer.feature ? layer.feature.properties : {};
+      const nomFeature = normaliserTexte(props.NOMCOM || props.nom_com || props.Commune);
+      if (nomFeature === communeNorm) {
+        targetBounds = layer.getBounds();
+      }
+    });
+  } else if (coucheFondCommunes) {
+    targetBounds = coucheFondCommunes.getBounds();
+  }
+
+  // 3. Application du cadrage optimisé et export SVG
+  if (targetBounds && targetBounds.isValid()) {
+    // Calcul des marges pour réserver l'angle inférieur droit à la légende
+    const legendW = legendElement ? (legendElement.offsetWidth + 30) : 240;
+    const legendH = legendElement ? (legendElement.offsetHeight + 30) : 180;
+
+    // Recadrage instantané sans animation
+    map.fitBounds(targetBounds, {
+      paddingTopLeft: [40, 40],
+      paddingBottomRight: [legendW, legendH],
       animate: false
     });
 
-    // Attendre un court instant que Leaflet redessine le SVG au nouveau zoom
-    setTimeout(() => {
-      genererSVG();
-    }, 200);
+    // Attente du rafraîchissement complet du DOM/Canvas Leaflet
+    map.once('moveend', () => {
+      setTimeout(genererSVG, 50);
+    });
+
+    // Déclencheur de secours si Leaflet était déjà à la bonne emprise
+    setTimeout(genererSVG, 150);
   } else {
     genererSVG();
   }

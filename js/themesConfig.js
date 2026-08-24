@@ -14,7 +14,7 @@ const THEMES_CONFIG = {
   },
 
   conso_effective: {
-    label: "2. Consommation d'ENAF effective",
+    label: "2. Consommation d'ENAF effective 2009-2022",
     source: () => (typeof ConsoEnaf0922 !== 'undefined' ? ConsoEnaf0922 : null),
     filters: { periode: ["2009_2022"] },
     style: (feature) => (typeof styleConsoEffective === 'function' ? styleConsoEffective(feature) : {}),
@@ -42,19 +42,19 @@ const THEMES_CONFIG = {
     legend: () => (typeof legendConstruEffectives !== 'undefined' ? legendConstruEffectives : null)
   },
 
-  constructions_planifiees: {
-    label: "4. Constructions planifiées",
-    source: () => (typeof suiviConstru !== 'undefined' ? suiviConstru : null),
-    filters: { destination: ["TOUT", "LOGEMENTS", "ACTIVITES_EQUIPEMENTS"] },
-    style: (feature) => (typeof styleConstruPlanifiees === 'function' ? styleConstruPlanifiees(feature) : {}),
-    updateTable: (data, commune) => {
-      if (typeof mettreAJourTableauConstruPlanifiees === 'function') {
-        mettreAJourTableauConstruPlanifiees(data, commune);
-      }
-    },
-    legend: () => (typeof legendConstruPlanifiees !== 'undefined' ? legendConstruPlanifiees : null)
+constructions_planifiees: {
+  label: "4. Constructions planifiées",
+  source: () => (typeof suiviConstru !== 'undefined' ? suiviConstru : null),
+  filters: { destination: ["TOUT", "LOGEMENTS", "ACTIVITES_EQUIPEMENTS"] },
+  style: (feature) => (typeof styleConstruPlanifiees === 'function' ? styleConstruPlanifiees(feature) : {}),
+  onEachFeature: (feature, layer) => (typeof onEachFeaturePlanifiees === 'function' ? onEachFeaturePlanifiees(feature, layer) : null),
+  updateTable: (data, commune) => {
+    if (typeof mettreAJourTableauConstruPlanifiees === 'function') {
+      mettreAJourTableauConstruPlanifiees(data, commune);
+    }
   },
-
+  legend: () => (typeof legendConstruPlanifiees !== 'undefined' ? legendConstruPlanifiees : null)
+},
   conso_planifiee: {
     label: "5. Consommation d'ENAF planifiée",
     source: () => (typeof EnafPlanifieeData !== 'undefined' ? EnafPlanifieeData : null),

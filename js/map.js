@@ -1,23 +1,23 @@
-// Initialisation de la carte
-const map = L.map('map');
+// Initialisation de la carte centrée sur le SICOVAL
+const map = L.map('map',{
+  preferCanvas: false,
+}).setView([43.515, 1.525], 11);
 
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 });
 
-const hot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+const hot = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 });
 
 const EsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  attribution: 'Tiles &copy; Esri'
 });
 
 osm.addTo(map);
 
-
-
-const layerControl = L.control.layers(
+L.control.layers(
   { 
     "OpenStreetMap": osm, 
     "OpenStreetMap HOT": hot, 
@@ -26,345 +26,420 @@ const layerControl = L.control.layers(
   {}
 ).addTo(map);
 
-function mettreAJourDateEsri() {
-  // Si la couche Esri n'est pas active sur la carte, inutile d'interroger l'API
-  if (!map.hasLayer(EsriImagery)) return;
+let coucheFondCommunes = null;
 
-  const center = map.getCenter();
-  const bounds = map.getBounds();
-  const size = map.getSize();
+function ajouterFondCommunes() {
+  if (typeof communesData === "undefined" || !communesData) return;
 
-  const metadataUrl = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/identify?` +
-    `geometry=${center.lng},${center.lat}` +
-    `&geometryType=esriGeometryPoint` +
-    `&sr=4326` +
-    `&layers=all` +
-    `&tolerance=2` +
-    `&mapExtent=${bounds.toBBoxString()}` +
-    `&imageDisplay=${size.x},${size.y},96` +
-    `&f=json`;
+  if (!map.getPane('paneCommunes')) {
+    map.createPane('paneCommunes');
+    map.getPane('paneCommunes').style.zIndex = 350; // S'assure que le fond reste DERRIÈRE les données (qui sont à 400+)
+  }
 
-  fetch(metadataUrl)
-    .then(res => res.json())
-    .then(data => {
-      if (data.results && data.results.length > 0) {
-        const attributes = data.results[0].attributes;
-        const datePriseDeVue = attributes.NICE_DATE || attributes.DATE || "";
-        
-        // Cibler directement le span du sélecteur de couches Leaflet
-        const labels = document.querySelectorAll('.leaflet-control-layers-base label');
-        labels.forEach(label => {
-          if (label.textContent.includes("Esri World Imagery")) {
-            const span = label.querySelector('span');
-            if (span) {
-              // Reconstruire proprement le contenu du span : Input Radio + Nouveau Texte
-              const input = span.querySelector('input');
-              const texteFormatted = datePriseDeVue 
-                ? ` Esri World Imagery (${datePriseDeVue})` 
-                : " Esri World Imagery";
-
-              // Réinjection propre sans concaténation
-              span.innerHTML = '';
-              if (input) span.appendChild(input);
-              span.appendChild(document.createTextNode(texteFormatted));
-            }
-          }
-        });
+  coucheFondCommunes = L.geoJSON(communesData, {
+    pane: 'paneCommunes',
+    style: {
+      color: "#2c3e50",
+      weight: 1.5,
+      fillColor: "#ecf0f1",
+      fillOpacity: 0.1,
+      dashArray: "3, 3"
+    },
+    onEachFeature: (feature, layer) => {
+      if (feature.properties && feature.properties.NOMCOM) {
+        layer.bindTooltip(feature.properties.NOMCOM, { sticky: true });
       }
-    })
-    .catch(err => console.error("Erreur métadonnées Esri :", err));
+    }
+  }).addTo(map);
+
+  try {
+    map.fitBounds(coucheFondCommunes.getBounds());
+  } catch(e) {}
 }
 
-// Écouteurs pour mettre à jour la date au déplacement ou changement de couche
-map.on('moveend', mettreAJourDateEsri);
+function gererZoomCommune(nomCommune) {
+  if (!coucheFondCommunes) return;
 
-map.on('baselayerchange', function(e) {
-  if (e.layer === EsriImagery) {
-    mettreAJourDateEsri();
-  }
-});
+  const communeNorm = normaliserTexte(nomCommune);
+  let layerCible = null;
 
-// Styles
-const styleNormal = {
-  color: "#2b5c8f",
-  weight: 2,
-  fillColor: "#6baed6",
-  fillOpacity: 0.35
-};
+  coucheFondCommunes.eachLayer(layer => {
+    const props = layer.feature ? layer.feature.properties : {};
+    const nomFeature = normaliserTexte(props.NOMCOM || props.nom_com || props.Commune);
 
-const styleSelection = {
-  color: "#c48a00",
-  weight: 3,
-  fillColor: "#ffe082",
-  fillOpacity: 0.1
-};
-
-// Variable globale gardant en mémoire le style actif
-let styleActif = "typologie";
-
-// ==========================================
-// 1. STYLE TYPOLOGIE (Style existant)
-// ==========================================
-function styleProductionLgt(feature) {
-  const props = feature.properties || {};
-
-  const etat = props.ETAT ? props.ETAT.toString().trim().toUpperCase() : "";
-  if (etat !== "CONSTRUIT") {
-    return { stroke: false, fill: false, fillOpacity: 0, opacity: 0 };
-  }
-
-  const type2 = props.Type2Urban ? props.Type2Urban.toString().trim().toUpperCase() : "";
-  const dateLivrai = props.DateLivrai ? props.DateLivrai.toString().trim() : "";
-  const urbanisation = normaliserTexte(props.Urbanisati);
-
-  const couleurs = {
-    DP_2009_2022: "#29b6f6",
-    DP_2022_2025: "#1d22e5",
-    DC_2009_2022: "#f48fb1",
-    DC_2022_2025: "#a000b2",
-    RU_2009_2022: "#ffeb3b",
-    RU_2022_2025: "#f57c00",
-    EXT_2009_2022: "#ff0000",
-    EXT_2022_2025: "#800000"
-  };
-
-  let fillColor = "#95a5a6";
-
-  if (urbanisation.includes("conso enaf") || urbanisation.includes("conso_enaf")) {
-    fillColor = dateLivrai === "2009_2022" ? couleurs.EXT_2009_2022 : couleurs.EXT_2022_2025;
-  } else if (urbanisation.includes("intensif")) {
-    if (type2 === "DP") fillColor = dateLivrai === "2009_2022" ? couleurs.DP_2009_2022 : couleurs.DP_2022_2025;
-    else if (type2 === "DC") fillColor = dateLivrai === "2009_2022" ? couleurs.DC_2009_2022 : couleurs.DC_2022_2025;
-    else if (type2 === "RU") fillColor = dateLivrai === "2009_2022" ? couleurs.RU_2009_2022 : couleurs.RU_2022_2025;
-  }
-
-  return { color: "#ffffff", weight: 0.8, fillColor: fillColor, fillOpacity: 0.85 };
-}
-
-// Légende Typologie
-const legendTypologie = L.control({ position: 'bottomright' });
-legendTypologie.onAdd = function () {
-  const div = L.DomUtil.create('div', 'info legend');
-  div.style.cssText = 'background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); font-size: 12px; line-height: 18px; color: #333;';
-
-  const categories = [
-    { label: "<b>Division parcellaire</b>", items: [{ color: "#29b6f6", text: "2009–2022" }, { color: "#1d22e5", text: "2022–2025" }] },
-    { label: "<b>Comblement de « dent creuse »</b>", items: [{ color: "#f48fb1", text: "2009–2022" }, { color: "#a000b2", text: "2022–2025" }] },
-    { label: "<b>Renouvellement urbain</b>", items: [{ color: "#ffeb3b", text: "2009–2022" }, { color: "#f57c00", text: "2022–2025" }] },
-    { label: "<b>Extension</b>", items: [{ color: "#ff0000", text: "2009–2022" }, { color: "#800000", text: "2022–2025" }] }
-  ];
-
-  let html = '<h4 style="margin:0 0 8px 0; font-size:13px; border-bottom: 1px solid #ccc; padding-bottom: 3px;">Typologie</h4>';
-  categories.forEach(cat => {
-    html += `<div style="margin-top: 5px;">${cat.label}</div>`;
-    cat.items.forEach(item => {
-      html += `<div style="display: flex; align-items: center; justify-content: space-between; margin-left: 8px; margin-top: 2px;">
-        <span style="margin-right: 8px;">${item.text}</span>
-        <i style="background: ${item.color}; width: 18px; height: 18px; display: inline-block; border-radius: 2px; border: 1px solid #fff;"></i>
-      </div>`;
-    });
+    if (communeNorm && nomFeature === communeNorm) {
+      layerCible = layer;
+      layer.setStyle({
+        color: "#d35400",
+        weight: 3.5,
+        fillColor: "#f39c12",
+        fillOpacity: 0.15,
+        dashArray: null
+      });
+    } else {
+      layer.setStyle({
+        color: "#2c3e50",
+        weight: 1.5,
+        fillColor: "#ecf0f1",
+        fillOpacity: 0.05,
+        dashArray: "3, 3"
+      });
+    }
   });
 
-  div.innerHTML = html;
-  return div;
-};
-
-const legendConso = L.control({ position: 'bottomright' });
-legendConso.onAdd = function () {
-  const div = L.DomUtil.create('div', 'info legend');
-  div.style.cssText = 'background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); font-size: 12px;';
-
-  // Lit le champ ENAF actuellement sélectionné (ex: ENAF2022, ENAF2019, ...)
-  const selectEnaf = document.getElementById("periode-enaf-select");
-  const champActuel = selectEnaf && selectEnaf.value ? selectEnaf.value : "ENAF2022";
-  const anneeAffichee = champActuel.replace("ENAF", "") || "2022";
-
-  div.innerHTML = `
-    <h4 style="margin:0 0 8px 0; font-size:13px; border-bottom:1px solid #ccc; padding-bottom:3px;">ENAF (${anneeAffichee})</h4>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
-      <span>Espace consommé (Oui)</span>
-      <i style="background:#2ecc71;width:18px;height:18px;display:inline-block;border-radius:2px;"></i>
-    </div>`;
-  return div;
-};
-
-// Force le rafraîchissement de la légende Conso (par ex. après changement de champ ENAF)
-function rafraichirLegendeConso() {
-  if (map.hasLayer(legendConso)) {
-    map.removeControl(legendConso);
-    legendConso.addTo(map);
+  if (layerCible) {
+    const bounds = layerCible.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    }
+  } else {
+    try {
+      const boundsGlobale = coucheFondCommunes.getBounds();
+      if (boundsGlobale.isValid()) {
+        map.fitBounds(boundsGlobale, { padding: [10, 10] });
+      }
+    } catch (e) {
+      map.setView([43.515, 1.525], 11);
+    }
   }
 }
 
-// ==========================================
-// 2. STYLE DESTINATION
-// ==========================================
-function styleDestination(feature) {
-  const props = feature.properties || {};
-  const dest = props.Destinatio ? props.Destinatio.toString().trim().toUpperCase() : "";
+// Charger le fond de carte
+ajouterFondCommunes();
 
-  let fillColor = "#95a5a6"; // Gris par défaut
+// ==========================================
+// STYLES ET LÉGENDES DES THÈMES
+// ==========================================
 
-  switch (dest) {
-    case "ACT":
-      fillColor = "#9b59b6"; // Violet pour Activités
-      break;
-    case "HAB":
-      fillColor = "#2ecc71"; // Vert pour Habitat
-      break;
-    case "EQUIP":
-      fillColor = "#3498db"; // Bleu pour Équipements
-      break;
+function styleEnafActuel(feature) {
+  const p = feature.properties || {};
+  const valeur = p.EspNAF22 ? p.EspNAF22.toString().trim() : "";
+
+  let fillColor = "#88c437"; // Vert ENAF
+
+  if (valeur === "NonNaf") {
+    fillColor = "#eb2026"; // Rouge NonNaf
   }
 
   return {
-    color: "#ffffff",
-    weight: 0.8,
     fillColor: fillColor,
+    weight: 0.8,
+    opacity: 0.9,
+    color: "#ffffff",
     fillOpacity: 0.85
   };
 }
 
-// Légende Destination
-const legendDestination = L.control({ position: 'bottomright' });
-legendDestination.onAdd = function () {
-  const div = L.DomUtil.create('div', 'info legend');
-  div.style.cssText = 'background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); font-size: 12px; line-height: 18px; color: #333;';
-
-  const items = [
-    { color: "#2ecc71", text: "Habitat (HAB)" },
-    { color: "#9b59b6", text: "Activité (ACT)" },
-    { color: "#3498db", text: "Équipement (EQUIP)" }
-  ];
-
-  let html = '<h4 style="margin:0 0 8px 0; font-size:13px; border-bottom: 1px solid #ccc; padding-bottom: 3px;">Destination</h4>';
-  items.forEach(item => {
-    html += `<div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
-      <span style="margin-right: 12px;">${item.text}</span>
-      <i style="background: ${item.color}; width: 18px; height: 18px; display: inline-block; border-radius: 2px; border: 1px solid #fff;"></i>
-    </div>`;
-  });
-
-  div.innerHTML = html;
-  return div;
-};
-// ==========================================
-// 3. STYLE CONSOMMATION (ENAF)
-// ==========================================
-// Fonction de style ENAF : seules les entités "oui" (champ sélectionné) sont chargées dans la couche
-function styleConsommation(feature) {
-  return { color: "#1e8449", weight: 1, fillColor: "#2ecc71", fillOpacity: 0.6 };
+function styleConsoEffective(feature) {
+  return {
+    fillColor: "#eb2026",
+    weight: 1,
+    opacity: 0.9,
+    color: "#7a1c1f",
+    fillOpacity: 0.8
+  };
 }
-// ==========================================
-// SÉLECTEUR DE STYLE INTÉGRÉ À LA CARTE
-// ==========================================
-const styleControl = L.control({ position: 'topright' });
 
-styleControl.onAdd = function () {
-  const div = L.DomUtil.create('div', 'leaflet-style-control');
-  
-  // Style du conteneur sur la carte
-  div.style.cssText = `
-    background: white;
-    padding: 6px 10px;
-    border-radius: 5px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
-    font-size: 13px;
-    font-family: Arial, sans-serif;
-  `;
+function styleConstruEffectives(feature) {
+  const p = feature.properties || {};
+  const typeNorm = normaliserTexte(p.Type2Urban);
+  const dateNorm = p.DateLivrai ? p.DateLivrai.toString().trim().replace('-', '_') : "";
 
+  let fillColor = "#95a5a6";
+
+  if (typeNorm === 'dp' || typeNorm === 'dc') {
+    if (dateNorm === '2009_2022') fillColor = "#4ea3dd";
+    else if (dateNorm === '2022_2025') fillColor = "#2f55a4";
+    else fillColor = "#3498db";
+  } else if (typeNorm === 'ru') {
+    if (dateNorm === '2009_2022') fillColor = "#f1c40f";
+    else if (dateNorm === '2022_2025') fillColor = "#f39c12";
+    else fillColor = "#e67e22";
+  } else if (typeNorm === 'ext' || typeNorm === 'extension') {
+    if (dateNorm === '2009_2022') fillColor = "#e74c3c";
+    else if (dateNorm === '2022_2025') fillColor = "#7b1113";
+    else fillColor = "#c0392b";
+  }
+
+  return {
+    fillColor: fillColor,
+    weight: 1,
+    opacity: 0.8,
+    color: "#2c3e50",
+    fillOpacity: 0.85
+  };
+}
+
+function styleConstruPlanifiees(feature) {
+  const p = feature.properties || {};
+  const etat = p.ETAT ? p.ETAT.toString().trim().toUpperCase() : "";
+
+  // 1. Exclusions (masquées) : CONSTRUIT et PC
+  if (etat === "CONSTRUIT" ) {
+    return { opacity: 0, fillOpacity: 0, weight: 0 };
+  }
+
+  let fillColor = "#95a5a6"; // Couleur par défaut (gris)
+
+  // 2. Attribution des couleurs selon l'ETAT
+  if (etat.startsWith("AU0_")) {
+    fillColor = "#5d4037"; // Marron (AU0)
+  } else if (etat.startsWith("AU_")) {
+    fillColor = "#ff5722"; // Orange/Rouge (AU)
+  } else if (etat.startsWith("U_")) {
+    fillColor = "#ffb74d"; // Orange clair (U)
+  } else if (etat === "ER") {
+    fillColor = "#e74c3c"; // Rouge vif (Emplacement Réservé)
+  } else if (etat === "REV_PLU") {
+    fillColor = "#2c3e50"; // Bleu sombre (Révision PLU)
+  } else if (etat ===  "PC") {
+    fillColor = "#d4e157"; // Vert clair (Permis de Construire)
+  }
+
+  return {
+    fillColor: fillColor,
+    weight: 1,
+    opacity: 0.9,
+    color: "#ffffff",
+    fillOpacity: 0.85
+  };
+}
+
+
+function styleConsoPlanifiee(feature) { return {}; }
+function stylePotentielDensif(feature) { return {}; }
+
+// LÉGENDES
+const legendConstruEffectives = L.control({ position: 'bottomright' });
+legendConstruEffectives.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.backgroundColor = 'white';
+  div.style.padding = '10px';
+  div.style.borderRadius = '5px';
+  div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+  div.style.fontSize = '12px';
+  div.style.lineHeight = '18px';
   div.innerHTML = `
-    <label for="style-select" style="font-weight: bold; margin-right: 6px;">Thème :</label>
-    <select id="style-select" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; cursor: pointer; outline: none;">
-      <option value="typologie">Typologie / Période</option>
-      <option value="destination">Destination (ACT, HAB, EQUIP)</option>
-    </select>
+    <strong style="display:block; margin-bottom:5px;">Typologie & Périodes</strong>
+    <b>Division parcellaire / Dent creuse (DC / DP)</b><br>
+    <i style="background:#4ea3dd; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2009–2022<br>
+    <i style="background:#2f55a4; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2022–2025<br>
+    <b style="margin-top:5px; display:block;">Renouvellement urbain</b>
+    <i style="background:#f1c40f; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2009–2022<br>
+    <i style="background:#f39c12; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2022–2025<br>
+    <b style="margin-top:5px; display:block;">Extension</b>
+    <i style="background:#e74c3c; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2009–2022<br>
+    <i style="background:#7b1113; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2022–2025<br>
   `;
-
-  // Désactiver la propagation du clic/scroll vers la carte lors de l'interaction
-  L.DomEvent.disableClickPropagation(div);
-  L.DomEvent.disableScrollPropagation(div);
-
   return div;
 };
 
-// Ajout du sélecteur à la carte
-styleControl.addTo(map);
+const legendConsoEffective = L.control({ position: 'bottomright' });
+legendConsoEffective.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.backgroundColor = 'white';
+  div.style.padding = '8px 12px';
+  div.style.borderRadius = '5px';
+  div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+  div.style.fontSize = '12px';
+  div.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="background: #b82c30; width: 16px; height: 16px; border-radius: 3px; display: inline-block;"></span>
+      <strong style="color: #2c3e50;">ENAF consommé</strong>
+    </div>
+  `;
+  return div;
+};
 
+const legendEnafActuel = L.control({ position: 'bottomright' });
+legendEnafActuel.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.backgroundColor = 'white';
+  div.style.padding = '10px 14px';
+  div.style.borderRadius = '5px';
+  div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+  div.style.fontSize = '12px';
+  div.innerHTML = `
+    <strong style="display:block; margin-bottom:8px; color:#2c3e50;">Typologie des espaces</strong>
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <span style="background:#88c437; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>ENAF</span>
+    </div>
+    <div style="display: flex; align-items: center;">
+      <span style="background:#e84a27; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>non-ENAF</span>
+    </div>
+  `;
+  return div;
+};
 
-const suiviLayer = L.geoJSON(suiviConstru, {
-  style: styleProductionLgt
-  // La gestion du click/popup sera faite dynamiquement dans main.js
-});
+// Légende pour les constructions planifiées
+const legendConstruPlanifiees = L.control({ position: 'bottomright' });
+legendConstruPlanifiees.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.backgroundColor = 'white';
+  div.style.padding = '10px 14px';
+  div.style.borderRadius = '5px';
+  div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+  div.style.fontSize = '12px';
+  div.style.lineHeight = '20px';
+  div.innerHTML = `
+    <strong style="display:block; margin-bottom:8px; color:#2c3e50;">Logements autorisés et projetés</strong>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#d4e157; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>PC en cours</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#ffb74d; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>Secteurs U (OAP & hors OAP)</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#ff5722; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>Secteurs AU (OAP & hors OAP)</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#5d4037; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>Secteurs AU0 (OAP & hors OAP)</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#2c3e50; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>Révision en cours / Emplacement réservé</span>
+    </div>
+  `;
+  return div;
+};
 
+function genererContenuPopup(properties) {
+  if (!properties) return "<em>Aucune donnée disponible</em>";
+  let html = "<div style='font-family: sans-serif; font-size: 13px;'>";
+  html += "<strong style='color: #2b5c8f;'>Informations Foncières</strong><br><hr style='margin:4px 0;'>";
+  for (const [key, value] of Object.entries(properties)) {
+    if (["gid", "id", "fid", "geom"].includes(key.toLowerCase())) continue;
+    if (value !== null && value !== undefined) {
+      html += `<b>${key} :</b> ${value}<br>`;
+    }
+  }
+  html += "</div>";
+  return html;
+}
 
-// Couche 2 : Consommation (ex: une autre variable GeoJSON ou un style dédié)
-const consoLayer = L.geoJSON(typeof Enaf2022 !== 'undefined' ? Enaf2022 : null, {
-  style: styleConsommation
-});
+// ==========================================
+// EXPORTER LA CARTE EN IMAGE
+// ==========================================
 
-const consoLayer2009 = L.geoJSON(typeof Enaf2009 !== 'undefined' ? Enaf2009 : null, {
-  style: styleConsommation
-});
-suiviLayer.addTo(map);
-// Affichage de la légende par défaut
-legendTypologie.addTo(map);
+function exporterCarteSVG() {
+  // 1. Récupération des couches
+  const coucheCommunes = window.coucheCommunes; // Référence à votre couche Leaflet (GeoJSON) des communes
+  const paneDonnees = map.getPane('paneDonneesActives')?.querySelector('svg');
+  const paneCommunes = map.getPane('paneCommunes')?.querySelector('svg');
+  const legendElement = document.querySelector('.info.legend');
 
-// Couches GeoJSON pour les communes
-const communesLayer = L.geoJSON(communesData, { style: styleNormal, interactive: false }).addTo(map);
+  if (!paneDonnees && !paneCommunes) {
+    alert("Aucune couche vectorielle n'a été trouvée sur la carte.");
+    return;
+  }
 
-map.fitBounds(communesLayer.getBounds());
+  // 2. Fonction principale d'extraction SVG une fois le cadrage ajusté
+  const genererSVG = () => {
+    const width = map.getSize().x;
+    const height = map.getSize().y;
 
-// //LEGENDE
-// // Ajout de la légende sur la carte
-// const legend = L.control({ position: 'bottomright' });
+    const svgExport = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svgExport.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svgExport.setAttribute("width", width);
+    svgExport.setAttribute("height", height);
+    svgExport.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
-// legend.onAdd = function () {
-//   const div = L.DomUtil.create('div', 'info legend');
-  
-//   // Style du conteneur de la légende
-//   div.style.backgroundColor = 'white';
-//   div.style.padding = '10px';
-//   div.style.borderRadius = '5px';
-//   div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
-//   div.style.fontSize = '12px';
-//   div.style.lineHeight = '18px';
-//   div.style.color = '#333';
+    // Fond blanc
+    const rectFond = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rectFond.setAttribute("width", "100%");
+    rectFond.setAttribute("height", "100%");
+    rectFond.setAttribute("fill", "#ffffff");
+    svgExport.appendChild(rectFond);
 
-//   const categories = [
-//     { label: "<b>Division parcellaire</b>", items: [
-//       { color: "#29b6f6", text: "2009–2022" },
-//       { color: "#1d22e5", text: "2022–2025" }
-//     ]},
-//     { label: "<b>Comblement de « dent creuse »</b>", items: [
-//       { color: "#f48fb1", text: "2009–2022" },
-//       { color: "#a000b2", text: "2022–2025" }
-//     ]},
-//     { label: "<b>Renouvellement urbain</b>", items: [
-//       { color: "#ffeb3b", text: "2009–2022" },
-//       { color: "#f57c00", text: "2022–2025" }
-//     ]},
-//     { label: "<b>Extension</b>", items: [
-//       { color: "#ff0000", text: "2009–2022" },
-//       { color: "#800000", text: "2022–2025" }
-//     ]}
-//   ];
+    // Injection des chemins vectoriels
+    const injecterCoucheSvg = (svgSource) => {
+      if (!svgSource) return;
+      const pathsOrigine = svgSource.querySelectorAll('path');
+      pathsOrigine.forEach(path => {
+        const pathClone = path.cloneNode(true);
+        const computedStyle = window.getComputedStyle(path);
 
-//   let html = '<h4 style="margin:0 0 8px 0; font-size:13px; border-bottom: 1px solid #ccc; padding-bottom: 3px;">Typologie</h4>';
+        pathClone.style.fill = computedStyle.fill;
+        pathClone.style.fillOpacity = computedStyle.fillOpacity;
+        pathClone.style.stroke = computedStyle.stroke;
+        pathClone.style.strokeWidth = computedStyle.strokeWidth;
+        pathClone.style.strokeOpacity = computedStyle.strokeOpacity;
+        pathClone.style.strokeDasharray = computedStyle.strokeDasharray;
 
-//   categories.forEach(cat => {
-//     html += `<div style="margin-top: 5px;">${cat.label}</div>`;
-//     cat.items.forEach(item => {
-//       html += `
-//         <div style="display: flex; align-items: center; justify-content: space-between; margin-left: 8px; margin-top: 2px;">
-//           <span style="margin-right: 8px;">${item.text}</span>
-//           <i style="background: ${item.color}; width: 18px; height: 18px; display: inline-block; border-radius: 2px; border: 1px solid #fff;"></i>
-//         </div>`;
-//     });
-//   });
+        svgExport.appendChild(pathClone);
+      });
+    };
 
-//   div.innerHTML = html;
-//   return div;
-// };
+    const svgDonneesFraiches = map.getPane('paneDonneesActives')?.querySelector('svg');
+    const svgCommunesFraiches = map.getPane('paneCommunes')?.querySelector('svg');
 
-// legend.addTo(map);
+    injecterCoucheSvg(svgCommunesFraiches);
+    injecterCoucheSvg(svgDonneesFraiches);
+
+    // Intégration de la légende avec espace garanti
+    if (legendElement) {
+      const legendWidth = legendElement.offsetWidth || 240;
+      const legendHeight = legendElement.offsetHeight || 160;
+      const margin = 20;
+
+      const foreignObject = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+      foreignObject.setAttribute("x", width - legendWidth - margin);
+      foreignObject.setAttribute("y", height - legendHeight - margin);
+      foreignObject.setAttribute("width", legendWidth);
+      foreignObject.setAttribute("height", legendHeight);
+
+      const legendClone = legendElement.cloneNode(true);
+      legendClone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+      legendClone.style.margin = "0";
+      legendClone.style.backgroundColor = "#ffffff";
+      legendClone.style.boxSizing = "border-box";
+
+      foreignObject.appendChild(legendClone);
+      svgExport.appendChild(foreignObject);
+    }
+
+    // Téléchargement
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgExport);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const themeSelect = document.getElementById("theme-select")?.value || "carte";
+    const communeSelect = document.getElementById("commune-select")?.value || "SICOVAL";
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `carte_vectorielle_${themeSelect}_${communeSelect}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // 3. Ajustement du cadrage (Zoom & Marge/Padding) sur les limites de la commune
+  if (coucheCommunes && typeof coucheCommunes.getBounds === 'function') {
+    const bounds = coucheCommunes.getBounds();
+    
+    // fitBounds avec marge personnalisée :
+    // - paddingBottomRight laisse plus d'espace en bas à droite pour la légende
+    // - paddingTopLeft laisse une marge autour des contours supérieurs
+    map.fitBounds(bounds, {
+      paddingTopLeft: [50, 50],
+      paddingBottomRight: [260, 180], // Marge augmentée en bas à droite pour réserver la place à la légende
+      animate: false
+    });
+
+    // Attendre un court instant que Leaflet redessine le SVG au nouveau zoom
+    setTimeout(() => {
+      genererSVG();
+    }, 200);
+  } else {
+    genererSVG();
+  }
+}

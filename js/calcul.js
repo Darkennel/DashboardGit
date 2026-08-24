@@ -99,3 +99,121 @@ function testerPeriode(dateLivrai, periodeChoisie) {
   // 3. Périodes simples ("2009_2022", "2022_2025", "2026")
   return dateNorm === periodeChoisie;
 }
+
+function calculerSurfacesEnafActuel(features) {
+  let surfaceNonEnafHa = 0;
+  let surfaceEnafHa = 0;
+
+  features.forEach(f => {
+    const p = f.properties || {};
+    // La valeur est déjà en hectares
+    const area = Number(p.Shape_Area) || 0; 
+    const typeEsp = p.EspNAF22 ? p.EspNAF22.toString().trim() : "";
+
+    if (typeEsp === "NonNaf") {
+      surfaceNonEnafHa += area;
+    } else {
+      surfaceEnafHa += area;
+    }
+  });
+
+  const totalHa = surfaceNonEnafHa + surfaceEnafHa;
+
+  return {
+    nonEnafHa: surfaceNonEnafHa,
+    nonEnafPct: totalHa > 0 ? (surfaceNonEnafHa / totalHa) * 100 : 0,
+    enafHa: surfaceEnafHa,
+    enafPct: totalHa > 0 ? (surfaceEnafHa / totalHa) * 100 : 0,
+    totalHa: totalHa
+  };
+}
+
+function calculerConsoEffective(features) {
+  let surfaceTotaleHa = 0;
+
+  features.forEach(f => {
+    const p = f.properties || {};
+    // La surface est déjà exprimée en hectares
+    const area = Number(p.Shape_Area) || 0;
+    surfaceTotaleHa += area;
+  });
+
+  // Période 2009-2022 = 13 ans
+  const nbAnnees = 13;
+  const consoMoyenneAnnuelleHa = surfaceTotaleHa / nbAnnees;
+
+  return {
+    totaleHa: surfaceTotaleHa,
+    moyenneAnnuelleHa: consoMoyenneAnnuelleHa
+  };
+}
+
+// Calculs pour la destination LOGEMENTS (m² vers ha pour la surface)
+function calculerConstruLogements(features) {
+  let diffuLog = 0;
+  let ruLog = 0;
+  let extLog = 0;
+  let extSurfaceM2 = 0;
+
+  features.forEach(f => {
+    const p = f.properties || {};
+    const type = normaliserTexte(p.Type2Urban);
+    const nbLog = Number(p.NBLogement) || 0;
+    const areaM2 = Number(p.Shape_Area) || 0;
+
+    if (type === 'dc' || type === 'dp') {
+      diffuLog += nbLog;
+    } else if (type === 'ru') {
+      ruLog += nbLog;
+    } else if (type === 'ext' || type === 'extension') {
+      extLog += nbLog;
+      extSurfaceM2 += areaM2;
+    }
+  });
+
+  return { 
+    diffuLog, 
+    ruLog, 
+    extLog, 
+    extSurfaceHa: extSurfaceM2 / 10000 
+  };
+}
+
+// Calculs pour ACTIVITES / EQUIPEMENTS et TOUT (m² vers ha)
+function calculerConstruSurfacesConsoDensif(features) {
+  let actConsoM2 = 0, actDensifM2 = 0;
+  let equipConsoM2 = 0, equipDensifM2 = 0;
+  let toutConsoM2 = 0, toutDensifM2 = 0;
+
+  features.forEach(f => {
+    const p = f.properties || {};
+    const dest = normaliserTexte(p.Destinatio || p.destination);
+    const type = normaliserTexte(p.Type2Urban);
+    const areaM2 = Number(p.Shape_Area) || 0;
+
+    const isConso = (type === 'ext' || type === 'extension');
+    const isDensif = (type === 'dc' || type === 'dp' || type === 'ru');
+
+    // Tout (Global)
+    if (isConso) toutConsoM2 += areaM2;
+    if (isDensif) toutDensifM2 += areaM2;
+
+    // Activités vs Équipements
+    if (dest.includes('act')) {
+      if (isConso) actConsoM2 += areaM2;
+      if (isDensif) actDensifM2 += areaM2;
+    } else if (dest.includes('equip')) {
+      if (isConso) equipConsoM2 += areaM2;
+      if (isDensif) equipDensifM2 += areaM2;
+    }
+  });
+
+  return {
+    actConsoHa: actConsoM2 / 10000,
+    actDensifHa: actDensifM2 / 10000,
+    equipConsoHa: equipConsoM2 / 10000,
+    equipDensifHa: equipDensifM2 / 10000,
+    toutConsoHa: toutConsoM2 / 10000,
+    toutDensifHa: toutDensifM2 / 10000
+  };
+}

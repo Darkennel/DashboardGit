@@ -206,7 +206,29 @@ function styleConstruPlanifiees(feature) {
 }
 
 
-function styleConsoPlanifiee(feature) { return {}; }
+function styleConsoPlanifiee(feature) {
+  const p = feature.properties || {};
+  const typezone = p.typezone ? p.typezone.toString().trim().toUpperCase() : "";
+
+  let fillColor = "#95a5a6"; // Couleur par défaut (gris)
+
+  // 1. Attribution des couleurs selon le type de zone
+  if (typezone === "U" || typezone.startsWith("U")) {
+    fillColor = "#f14125"; // Rouge / ENAF en zone U
+  } else if (typezone === "AU" || typezone.startsWith("1AU") || typezone.startsWith("AU_")) {
+    fillColor = "#eb8f2d"; // Orange / ENAF en zone AU ouverte
+  } else if (typezone === "AU0" || typezone.startsWith("2AU") || typezone.startsWith("AU0_")) {
+    fillColor = "#dce135"; // Jaune / ENAF en zone AU fermée
+  }
+
+  return {
+    fillColor: fillColor,
+    weight: 1,
+    opacity: 0.9,
+    color: "#ffffff",
+    fillOpacity: 0.85
+  };
+}
 function stylePotentielDensif(feature) { return {}; }
 
 // LÉGENDES
@@ -304,6 +326,33 @@ legendConstruPlanifiees.onAdd = function () {
     <div style="display:flex; align-items:center; margin-bottom:3px;">
       <span style="background:#2c3e50; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
       <span>Révision en cours / Emplacement réservé</span>
+    </div>
+  `;
+  return div;
+};
+
+const legendConsoPlanifiee = L.control({ position: 'bottomright' });
+legendConsoPlanifiee.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.backgroundColor = 'white';
+  div.style.padding = '10px 14px';
+  div.style.borderRadius = '5px';
+  div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+  div.style.fontSize = '12px';
+  div.style.lineHeight = '20px';
+  div.innerHTML = `
+    <strong style="display:block; margin-bottom:8px; color:#2c3e50;">Consommation d'ENAF planifiée</strong>
+    <div style="display:flex; align-items:center; margin-bottom:4px;">
+      <span style="background:#f14125; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>ENAF en zone U</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:4px;">
+      <span style="background:#eb8f2d; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>ENAF en zone AU ouverte</span>
+    </div>
+    <div style="display:flex; align-items:center;">
+      <span style="background:#dce135; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>ENAF en zone AU fermée</span>
     </div>
   `;
   return div;

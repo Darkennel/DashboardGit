@@ -57,8 +57,8 @@ constructions_planifiees: {
 },
   conso_planifiee: {
     label: "5. Consommation d'ENAF planifiée",
-    source: () => (typeof EnafPlanifieeData !== 'undefined' ? EnafPlanifieeData : null),
-    filters: { zone: ["TOUT", "U", "AU", "AUO"] },
+    source: () => (typeof consoPlanifiee !== 'undefined' ? consoPlanifiee : null),
+    filters: { zone: ["TOUT", "U", "AU", "AU0"] },
     style: (feature) => (typeof styleConsoPlanifiee === 'function' ? styleConsoPlanifiee(feature) : {}),
     updateTable: (data, commune) => {
       if (typeof mettreAJourTableauConsoPlanifiee === 'function') {

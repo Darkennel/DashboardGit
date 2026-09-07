@@ -16,7 +16,7 @@ const THEMES_CONFIG = {
   conso_effective: {
     label: "2. Consommation d'ENAF effective 2009-2022",
     source: () => (typeof ConsoEnaf0922 !== 'undefined' ? ConsoEnaf0922 : null),
-    filters: { periode: ["2009_2022"] },
+    filters: {},
     style: (feature) => (typeof styleConsoEffective === 'function' ? styleConsoEffective(feature) : {}),
     updateTable: (data, commune) => {
       if (typeof mettreAJourTableauConsoEffective === 'function') {

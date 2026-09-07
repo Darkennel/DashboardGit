@@ -134,7 +134,7 @@ function calculerConsoEffective(features) {
   features.forEach(f => {
     const p = f.properties || {};
     // La surface est déjà exprimée en hectares
-    const area = Number(p.Shape_Area) || 0;
+    const area = Number(p.Conso0922) || 0;
     surfaceTotaleHa += area;
   });
 

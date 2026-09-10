@@ -99,7 +99,7 @@ function actualiserCarteEtDonnees(themeKey) {
   const featuresFiltrees = dataRaw.features.filter(f => {
     const p = f.properties || {};
 
-// 1. Filtre Lieu (Gestion de __NOMCOM et des autres variantes possibles)
+    // 1. Filtre Lieu (Gestion de __NOMCOM et des autres variantes possibles)
     if (communeNorm) {
       const nomComProp = p.__NOMCOM || p.NOMCOM || p.nom_com || p.Commune || 
                          p.commune || p.COMMUNE || p.nomcom || p.nom_commune || p.lib_com;
@@ -108,10 +108,9 @@ function actualiserCarteEtDonnees(themeKey) {
     }
 
     // 2. Filtre Période (uniquement si le filtre est actif)
-    if (periodeNorm && !testerPeriode(p.DateLivrai || p.Millesime || p.millesime, periodeNorm)) {
+    if (periodeNorm && config.filters.periode && !testerPeriode(p.DateLivrai || p.Millesime || p.millesime, periodeNorm)) {
       return false;
     }
-
     // 3. Filtre Destination (uniquement si le filtre est actif)
     if (destNorm && destNorm !== "TOUT") {
       const d = normaliserTexte(p.Destinatio || p.destination || p.DESTINATIO);
@@ -131,7 +130,7 @@ function actualiserCarteEtDonnees(themeKey) {
     map.getPane('paneDonneesActives').style.zIndex = 450;
   }
 
-// Instancier la nouvelle couche GeoJSON avec le Pane dédié
+  // Instancier la nouvelle couche GeoJSON avec le Pane dédié
   activeGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: featuresFiltrees }, {
     pane: 'paneDonneesActives',
     style: config.style,
@@ -146,29 +145,30 @@ function actualiserCarteEtDonnees(themeKey) {
     }
   }).addTo(map);
 
-// 1. Retirer l'ancienne légende proprement
-if (currentLegendControl) {
-  map.removeControl(currentLegendControl);
-  currentLegendControl = null;
-}
-
-// 2. Récupérer et afficher la nouvelle légende
-if (typeof config.legend === 'function') {
-  const legendInst = config.legend();
-  if (legendInst && typeof legendInst.addTo === 'function') {
-    currentLegendControl = legendInst;
-    currentLegendControl.addTo(map);
+  // 1. Retirer l'ancienne légende proprement
+  if (currentLegendControl) {
+    map.removeControl(currentLegendControl);
+    currentLegendControl = null;
   }
-}
+
+  // 2. Récupérer et afficher la nouvelle légende
+  if (typeof config.legend === 'function') {
+    const legendInst = config.legend();
+    if (legendInst && typeof legendInst.addTo === 'function') {
+      currentLegendControl = legendInst;
+      currentLegendControl.addTo(map);
+    }
+  }
 
   // Mise à jour de la Sidebar
   if (typeof config.updateTable === 'function') {
-    config.updateTable(featuresFiltrees, communeNorm);
-  }
+      // Passer la commune sélectionnée
+      config.updateTable(featuresFiltrees, communeNorm); 
+    }
 }
 
 // ==========================================
-// CALCULS ET TABLEAUX (STUBS)
+// CALCULS ET TABLEAUX
 // ==========================================
 
 function mettreAJourTableauEnafActuel(data, commune) {
@@ -196,6 +196,7 @@ function mettreAJourTableauEnafActuel(data, commune) {
     </table>
   `;
 }
+
 function mettreAJourTableauConsoEffective(data, commune) {
   const container = document.getElementById("sidebar-recap-container");
   if (!container) return;
@@ -219,45 +220,46 @@ function mettreAJourTableauConsoEffective(data, commune) {
     </table>
   `;
 }
+
 function mettreAJourTableauConstruEffectives(data, commune) {
   const container = document.getElementById("sidebar-recap-container");
   if (!container) return;
 
   const destSelect = document.getElementById("destination-select")?.value || "TOUT";
   const fmtHa = (val) => val.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " ha";
-  const fmtNb = (val) => val.toLocaleString("fr-FR");
+  const fmtNb = (val) => val.toLocaleString("fr-FR") + " log.";
 
-  const tableStyle = "width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; background-color: #f39c12; color: #ffffff; text-align: center;";
+  const tableStyle = "width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; background-color: #f39c12; color: #ffffff;";
   const tdBorder = "border: 1px solid #e67e22; padding: 6px;";
 
-  // CAS 1 : LOGEMENTS
+  // SÉLECTEUR 1 : LOGEMENTS / HABITATION
   if (destSelect === "LOGEMENTS") {
     const res = calculerConstruLogements(data);
     container.innerHTML = `
       <table style="${tableStyle}">
         <tbody>
           <tr>
-            <td style="${tdBorder} font-weight: bold; text-align: left;">DIFFUS</td>
-            <td style="${tdBorder} text-align: right;">${fmtNb(res.diffuLog)} logements</td>
+            <td style="${tdBorder} font-weight: bold;">Densification diffuse (DC + DP)</td>
+            <td style="${tdBorder} text-align: right;">${fmtNb(res.diffuLog)}</td>
           </tr>
           <tr>
-            <td style="${tdBorder} font-weight: bold; text-align: left;">RU</td>
-            <td style="${tdBorder} text-align: right;">${fmtNb(res.ruLog)} logements</td>
+            <td style="${tdBorder} font-weight: bold;">Renouvellement urbain</td>
+            <td style="${tdBorder} text-align: right;">${fmtNb(res.ruLog)}</td>
           </tr>
           <tr>
-            <td style="${tdBorder} font-weight: bold; text-align: left;">Extension</td>
-            <td style="${tdBorder} text-align: right;">${fmtNb(res.extLog)} logements (${fmtHa(res.extSurfaceHa)})</td>
+            <td style="${tdBorder} font-weight: bold;">Extension</td>
+            <td style="${tdBorder} text-align: right;">${fmtNb(res.extLog)} (${fmtHa(res.extSurfaceHa)})</td>
           </tr>
         </tbody>
       </table>
     `;
   } 
   
-  // CAS 2 : ACTIVITES / EQUIPEMENTS
+  // SÉLECTEUR 2 : ACTIVITÉ / ÉQUIPEMENTS
   else if (destSelect === "ACTIVITES_EQUIPEMENTS") {
     const res = calculerConstruSurfacesConsoDensif(data);
     container.innerHTML = `
-      <table style="${tableStyle}">
+      <table style="${tableStyle} text-align: center;">
         <thead>
           <tr>
             <th colspan="2" style="${tdBorder} font-size: 1.05em;">Activités</th>
@@ -282,11 +284,11 @@ function mettreAJourTableauConstruEffectives(data, commune) {
     `;
   } 
   
-  // CAS 3 : TOUT
+  // SÉLECTEUR 3 : TOUT
   else {
     const res = calculerConstruSurfacesConsoDensif(data);
     container.innerHTML = `
-      <table style="${tableStyle}">
+      <table style="${tableStyle} text-align: center;">
         <thead>
           <tr>
             <th colspan="2" style="${tdBorder} font-size: 1.05em;">Tout</th>
@@ -306,7 +308,115 @@ function mettreAJourTableauConstruEffectives(data, commune) {
     `;
   }
 }
-function mettreAJourTableauConstruPlanifiees(data, commune) {}
+
+function mettreAJourTableauConstruPlanifiees(data, commune) {
+  const container = document.getElementById("sidebar-recap-container");
+  if (!container) return;
+
+  const destSelect = document.getElementById("destination-select")?.value || "TOUT";
+  const fmtLog = (val) => val.toLocaleString("fr-FR") + " log.";
+  const fmtHa = (val) => val.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " ha";
+
+  const tableStyle = "width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; background-color: #e67e22; color: #ffffff; text-align: center;";
+  const tdBorder = "border: 1px solid #d35400; padding: 6px;";
+
+  // 1. HABITATION / LOGEMENTS -> Unité : log.
+  if (destSelect === "LOGEMENTS") {
+    const res = calculerPlanifieesLogements(data);
+    container.innerHTML = `
+      <table style="${tableStyle}">
+        <thead>
+          <tr>
+            <th style="${tdBorder}"></th>
+            <th colspan="2" style="${tdBorder} font-size: 1.05em;">Habitat ou mixte</th>
+          </tr>
+          <tr>
+            <th style="${tdBorder}"></th>
+            <th style="${tdBorder}">Conso</th>
+            <th style="${tdBorder}">Densif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="${tdBorder} text-align: left; font-weight: bold;">Constructions autorisées</td>
+            <td style="${tdBorder}">${fmtLog(res.autConso)}</td>
+            <td style="${tdBorder}">${fmtLog(res.autDensif)}</td>
+          </tr>
+          <tr>
+            <td style="${tdBorder} text-align: left; font-weight: bold;">Constructions projetées</td>
+            <td style="${tdBorder}">${fmtLog(res.projConso)}</td>
+            <td style="${tdBorder}">${fmtLog(res.projDensif)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  } 
+  
+  // 2. ACTIVITÉS / ÉQUIPEMENTS -> Unité : ha
+  else if (destSelect === "ACTIVITES_EQUIPEMENTS") {
+    const res = calculerPlanifieesActEquipSurfaces(data);
+    container.innerHTML = `
+      <table style="${tableStyle}">
+        <thead>
+          <tr>
+            <th style="${tdBorder}"></th>
+            <th colspan="2" style="${tdBorder} font-size: 1.05em;">Activités - Equipements</th>
+          </tr>
+          <tr>
+            <th style="${tdBorder}"></th>
+            <th style="${tdBorder}">Conso</th>
+            <th style="${tdBorder}">Densif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="${tdBorder} text-align: left; font-weight: bold;">Constructions autorisées</td>
+            <td style="${tdBorder}">${fmtHa(res.autConsoHa)}</td>
+            <td style="${tdBorder}">${fmtHa(res.autDensifHa)}</td>
+          </tr>
+          <tr>
+            <td style="${tdBorder} text-align: left; font-weight: bold;">Constructions projetées</td>
+            <td style="${tdBorder}">${fmtHa(res.projConsoHa)}</td>
+            <td style="${tdBorder}">${fmtHa(res.projDensifHa)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  } 
+  
+  // 3. TOUT -> Unité : ha
+  else {
+    const res = calculerPlanifieesActEquipSurfaces(data);
+    container.innerHTML = `
+      <table style="${tableStyle}">
+        <thead>
+          <tr>
+            <th style="${tdBorder}"></th>
+            <th colspan="2" style="${tdBorder} font-size: 1.05em;">Tout</th>
+          </tr>
+          <tr>
+            <th style="${tdBorder}"></th>
+            <th style="${tdBorder}">Conso</th>
+            <th style="${tdBorder}">Densif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="${tdBorder} text-align: left; font-weight: bold;">Constructions autorisées</td>
+            <td style="${tdBorder}">${fmtHa(res.autConsoHa)}</td>
+            <td style="${tdBorder}">${fmtHa(res.autDensifHa)}</td>
+          </tr>
+          <tr>
+            <td style="${tdBorder} text-align: left; font-weight: bold;">Constructions projetées</td>
+            <td style="${tdBorder}">${fmtHa(res.projConsoHa)}</td>
+            <td style="${tdBorder}">${fmtHa(res.projDensifHa)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  }
+}
+
 function mettreAJourTableauConsoPlanifiee(data, commune) {}
 function mettreAJourTableauPotentiel(data, commune) {}
 
@@ -314,13 +424,13 @@ function mettreAJourTableauPotentiel(data, commune) {}
 document.getElementById("commune-select").addEventListener("change", (e) => {
   const nomCommune = e.target.value;
   
-  // 1. Zoomer sur la commune (ou recadrer)
   if (typeof gererZoomCommune === "function") {
     gererZoomCommune(nomCommune);
   }
   
-  // 2. Mettre à jour le filtrage des données
-  actualiserCarteEtDonnees();
+  // Transmettre le thème actuel à actualiserCarteEtDonnees
+  const currentTheme = document.getElementById("theme-select").value;
+  actualiserCarteEtDonnees(currentTheme);
 });
 
 document.getElementById("periode-select")?.addEventListener("change", () => actualiserCarteEtDonnees());
@@ -338,3 +448,37 @@ document.getElementById("btn-reset").addEventListener("click", () => {
 document.getElementById("btn-export-svg")?.addEventListener("click", () => {
   exporterCarteSVG();
 });
+
+function mettreAJourTableauIndicateursCaracterisation(features, communeNorm = "") {
+  const container = document.getElementById("sidebar-recap-container");
+  if (!container) return;
+
+  const periodeChoisie = document.getElementById("periode-select")?.value || "";
+  const stats = calculerIndicateursCaracterisation(features, communeNorm, periodeChoisie);
+
+  const tableStyle = "width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; background-color: #2c3e50; color: #ffffff;";
+  const tdLabelStyle = "padding: 8px; border-bottom: 1px solid #34495e; font-weight: bold;";
+  const tdValStyle = "padding: 8px; border-bottom: 1px solid #34495e; text-align: right; white-space: nowrap;";
+
+  container.innerHTML = `
+    <div style="font-weight: bold; font-size: 0.9em; margin-top: 15px; color: #2c3e50;">
+      Indicateurs de caractérisation
+    </div>
+    <table style="${tableStyle}">
+      <tbody>
+        <tr>
+          <td style="${tdLabelStyle}">IC1 — Surface parcellaire (Q1)</td>
+          <td style="${tdValStyle}">${stats.ic1_q1.toLocaleString("fr-FR")} m²</td>
+        </tr>
+        <tr>
+          <td style="${tdLabelStyle}">IC2 — Surface parcellaire (Médiane)</td>
+          <td style="${tdValStyle}">${stats.ic2_mediane.toLocaleString("fr-FR")} m²</td>
+        </tr>
+        <tr>
+          <td style="${tdLabelStyle}">IC3 — Densité opérations groupées</td>
+          <td style="${tdValStyle}">${stats.ic3_ratio.toLocaleString("fr-FR")} log/ha</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}

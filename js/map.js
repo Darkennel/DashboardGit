@@ -174,26 +174,52 @@ function styleConstruPlanifiees(feature) {
   const p = feature.properties || {};
   const etat = p.ETAT ? p.ETAT.toString().trim().toUpperCase() : "";
 
-  // 1. Exclusions (masquées) : CONSTRUIT et PC
-  if (etat === "CONSTRUIT" ) {
+  // Exclusion des entités déjà construites
+  if (etat === "CONSTRUIT") {
     return { opacity: 0, fillOpacity: 0, weight: 0 };
   }
 
-  let fillColor = "#95a5a6"; // Couleur par défaut (gris)
+  // Styles spécifiques pour Révision PLU et Emplacement Réservé (Contours / Hachures)
+  if (etat === "REV_PLU") {
+    return {
+      fillColor: "transparent",
+      weight: 2,
+      color: "#000000",
+      dashArray: "4, 4",
+      fillOpacity: 0
+    };
+  }
 
-  // 2. Attribution des couleurs selon l'ETAT
-  if (etat.startsWith("AU0_")) {
-    fillColor = "#5d4037"; // Marron (AU0)
-  } else if (etat.startsWith("AU_")) {
-    fillColor = "#ff5722"; // Orange/Rouge (AU)
-  } else if (etat.startsWith("U_")) {
-    fillColor = "#ffb74d"; // Orange clair (U)
-  } else if (etat === "ER") {
-    fillColor = "#e74c3c"; // Rouge vif (Emplacement Réservé)
-  } else if (etat === "REV_PLU") {
-    fillColor = "#2c3e50"; // Bleu sombre (Révision PLU)
-  } else if (etat ===  "PC") {
-    fillColor = "#d4e157"; // Vert clair (Permis de Construire)
+  if (etat === "ER") {
+    return {
+      fillColor: "transparent",
+      weight: 2,
+      color: "#000000",
+      dashArray: "2, 4",
+      fillOpacity: 0
+    };
+  }
+
+  // Attribution des couleurs exactes selon la valeur
+  let fillColor = "#95a5a6";
+
+  switch (etat) {
+    case "PC":
+      fillColor = "#dce135"; // Vert/Jaune PC
+      break;
+    case "U_OAP":
+    case "U_RIEN":
+    case "U_AU_OAP":
+      fillColor = "#fca038"; // Orange U
+      break;
+    case "AU_OAP":
+    case "AU_RIEN":
+      fillColor = "#f14125"; // Rouge/Orange AU
+      break;
+    case "AU0_OAP":
+    case "AU0_RIEN":
+      fillColor = "#61413a"; // Marron AU0
+      break;
   }
 
   return {
@@ -295,7 +321,6 @@ legendEnafActuel.onAdd = function () {
   return div;
 };
 
-// Légende pour les constructions planifiées
 const legendConstruPlanifiees = L.control({ position: 'bottomright' });
 legendConstruPlanifiees.onAdd = function () {
   const div = L.DomUtil.create('div', 'info legend');
@@ -308,24 +333,44 @@ legendConstruPlanifiees.onAdd = function () {
   div.innerHTML = `
     <strong style="display:block; margin-bottom:8px; color:#2c3e50;">Logements autorisés et projetés</strong>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#d4e157; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span style="background:#dce135; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
       <span>PC en cours</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#ffb74d; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
-      <span>Secteurs U (OAP & hors OAP)</span>
+      <span style="background:#fca038; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>U__OAP</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#ff5722; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
-      <span>Secteurs AU (OAP & hors OAP)</span>
+      <span style="background:#fca038; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>U__pas d’OAP</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#5d4037; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
-      <span>Secteurs AU0 (OAP & hors OAP)</span>
+      <span style="background:#fca038; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>U__AU__OAP</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#2c3e50; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
-      <span>Révision en cours / Emplacement réservé</span>
+      <span style="background:#f14125; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>AU__OAP</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#f14125; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>AU__pas d’OAP</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#61413a; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>AU0__OAP</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:#61413a; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
+      <span>AU0__pas d’OAP</span>
+    </div>
+    <div style="display:flex; align-items:center; margin-bottom:3px;">
+      <span style="background:repeating-linear-gradient(45deg, #000, #000 2px, #fff 2px, #fff 6px); width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #000;"></span>
+      <span>Révision en cours</span>
+    </div>
+    <div style="display:flex; align-items:center;">
+      <span style="background:repeating-linear-gradient(45deg, #000, #000 2px, #fff 2px, #fff 4px), repeating-linear-gradient(-45deg, #000, #000 2px, #fff 2px, #fff 4px); width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #000;"></span>
+      <span>Emplacement réservé</span>
     </div>
   `;
   return div;

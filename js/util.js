@@ -38,3 +38,30 @@ function initCommunes() {
     selectCommune.appendChild(opt);
   });
 }
+
+/**
+ * Exporte le tableau HTML récapitulatif actuellement affiché dans la sidebar sous forme de fichier Excel (.xlsx)
+ */
+function exporterTableauExcel() {
+  const container = document.getElementById("sidebar-recap-container");
+  const table = container ? container.querySelector("table") : null;
+
+  if (!table) {
+    alert("Aucun tableau récapitulatif disponible à exporter.");
+    return;
+  }
+
+  // Récupération des filtres actuels pour composer un nom de fichier clair
+  const themeSelect = document.getElementById("theme-select")?.value || "indicateurs";
+  const communeSelect = document.getElementById("commune-select")?.value || "SICOVAL";
+  const nomFichier = `recapitulatif_${themeSelect}_${communeSelect}.xlsx`;
+
+  // Conversion de la table HTML en classeur Excel
+  const workbook = XLSX.utils.table_to_book(table, { sheet: "Récapitulatif" });
+
+  // Téléchargement du fichier .xlsx
+  XLSX.writeFile(workbook, nomFichier);
+}
+
+// Écouteur d'événement sur le bouton
+document.getElementById("btn-export-excel")?.addEventListener("click", exporterTableauExcel);

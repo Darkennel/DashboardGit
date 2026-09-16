@@ -144,9 +144,18 @@ function styleConstruEffectives(feature) {
   const p = feature.properties || {};
   const typeNorm = normaliserTexte(p.Type2Urban);
   const dateNorm = p.DateLivrai ? p.DateLivrai.toString().trim().replace('-', '_') : "";
+  const isconstruit = p.ETAT ? p.ETAT.toString().trim().toUpperCase() === "CONSTRUIT" : false;
+
+  if (!isconstruit) {
+    return {
+      stroke: false,
+      fill: false,
+      opacity: 0,
+      fillOpacity: 0
+    };
+  }
 
   let fillColor = "#95a5a6";
-
   if (typeNorm === 'dp' || typeNorm === 'dc') {
     if (dateNorm === '2009_2022') fillColor = "#4ea3dd";
     else if (dateNorm === '2022_2025') fillColor = "#2f55a4";
@@ -169,6 +178,7 @@ function styleConstruEffectives(feature) {
     fillOpacity: 0.85
   };
 }
+  
 
 function styleConstruPlanifiees(feature) {
   const p = feature.properties || {};
@@ -430,7 +440,26 @@ function exporterCarteSVG() {
     return;
   }
 
-  // Fonction générant et téléchargeant le fichier SVG
+  // 1. Récupération de la commune sélectionnée et calcul de sa BBox (Bounding Box)
+  const communeNorm = normaliserTexte(document.getElementById("commune-select")?.value);
+  let targetBounds = null;
+
+  if (communeNorm && coucheFondCommunes) {
+    coucheFondCommunes.eachLayer(layer => {
+      const props = layer.feature ? layer.feature.properties : {};
+      const nomFeature = normaliserTexte(props.NOMCOM || props.nom_com || props.Commune);
+      if (nomFeature === communeNorm) {
+        targetBounds = layer.getBounds(); // BBox exacte de la commune choisie
+      }
+    });
+  }
+  
+  // Si aucune commune ou si non trouvée, prend la BBox globale du territoire SICOVAL
+  if (!targetBounds && coucheFondCommunes) {
+    targetBounds = coucheFondCommunes.getBounds();
+  }
+
+  // 2. Fonction de génération du fichier SVG
   const genererSVG = () => {
     const width = map.getSize().x;
     const height = map.getSize().y;
@@ -513,42 +542,17 @@ function exporterCarteSVG() {
     URL.revokeObjectURL(url);
   };
 
-  // 1. Récupération de la commune sélectionnée
-  const communeNorm = normaliserTexte(document.getElementById("commune-select")?.value);
-  let targetBounds = null;
-
-  // 2. Recherche des limites (bounds) de la commune sélectionnée ou globales
-  if (communeNorm && coucheFondCommunes) {
-    coucheFondCommunes.eachLayer(layer => {
-      const props = layer.feature ? layer.feature.properties : {};
-      const nomFeature = normaliserTexte(props.NOMCOM || props.nom_com || props.Commune);
-      if (nomFeature === communeNorm) {
-        targetBounds = layer.getBounds();
-      }
-    });
-  } else if (coucheFondCommunes) {
-    targetBounds = coucheFondCommunes.getBounds();
-  }
-
-  // 3. Application du cadrage optimisé et export SVG
+  // 3. Recadrage strict sur l'étendue (BBox) de la commune avant la génération
   if (targetBounds && targetBounds.isValid()) {
-    // Calcul des marges pour réserver l'angle inférieur droit à la légende
-    const legendW = legendElement ? (legendElement.offsetWidth + 30) : 240;
-    const legendH = legendElement ? (legendElement.offsetHeight + 30) : 180;
-
-    // Recadrage instantané sans animation
     map.fitBounds(targetBounds, {
-      paddingTopLeft: [40, 40],
-      paddingBottomRight: [legendW, legendH],
+      padding: [20, 20], // Marge régulière autour de la BBox de la commune
       animate: false
     });
 
-    // Attente du rafraîchissement complet du DOM/Canvas Leaflet
     map.once('moveend', () => {
       setTimeout(genererSVG, 50);
     });
 
-    // Déclencheur de secours si Leaflet était déjà à la bonne emprise
     setTimeout(genererSVG, 150);
   } else {
     genererSVG();

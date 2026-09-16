@@ -67,7 +67,24 @@
   cursor: pointer;
   margin-bottom: 15px;
 }
+#btn-export-excel {
+  width: 100%;
+  padding: 8px;
+  background-color: #1d6f42; /* Vert Excel */
+  color: #ffffff;
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 5px;
+  margin-bottom: 10px;
+  transition: background-color 0.2s ease;
+}
 
+#btn-export-excel:hover {
+  background-color: #155231;
+}
 /* Titres de section */
 #sidebar h3 {
   font-size: 15px;

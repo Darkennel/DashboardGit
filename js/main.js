@@ -418,3 +418,5 @@ function basculerSelecteursPeriode(mode) {
     if (labelEnaf) labelEnaf.style.display = "none";
   }
 }
+
+

@@ -10,13 +10,39 @@ function normaliserTexte(str) {
     .trim();
 }
 
-function initCommunes() {
+// À AJOUTER EN HAUT DE js/util.js
+const geojsonCache = {};
+
+async function chargerDonneesGeoJSON(url) {
+  if (!url) return null;
+  
+  if (geojsonCache[url]) {
+    return geojsonCache[url];
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    geojsonCache[url] = data;
+    return data;
+  } catch (error) {
+    console.error(`Impossible de charger le GeoJSON à l'adresse : ${url}`, error);
+    return null;
+  }
+}
+
+async function initCommunes() {
   const selectCommune = document.getElementById("commune-select");
   if (!selectCommune) return;
 
   // Conserver l'option par défaut (SICOVAL - Ensemble du territoire)
   selectCommune.innerHTML = '<option value="">-- SICOVAL (Ensemble du territoire) --</option>';
+  const communesData = await chargerDonneesGeoJSON('datageojson/CommunesSico.geojson');
 
+  console.log("communesData:", communesData);
   // Vérification de la présence des données
   if (typeof communesData === "undefined" || !communesData.features) {
     console.warn("La variable communesData n'est pas chargée.");

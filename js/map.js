@@ -26,14 +26,20 @@ L.control.layers(
   {}
 ).addTo(map);
 
+let communesData = null;
 let coucheFondCommunes = null;
 
-function ajouterFondCommunes() {
-  if (typeof communesData === "undefined" || !communesData) return;
+async function ajouterFondCommunes() {
+  // Attente du chargement effectif des données
+  communesData = await chargerDonneesGeoJSON('datageojson/CommunesSico.geojson');
+
+  console.log("ajouterFondCommunes - communesData:", communesData);
+
+  if (!communesData || !communesData.features) return;
 
   if (!map.getPane('paneCommunes')) {
     map.createPane('paneCommunes');
-    map.getPane('paneCommunes').style.zIndex = 350; // S'assure que le fond reste DERRIÈRE les données (qui sont à 400+)
+    map.getPane('paneCommunes').style.zIndex = 350;
   }
 
   coucheFondCommunes = L.geoJSON(communesData, {
@@ -57,8 +63,14 @@ function ajouterFondCommunes() {
   } catch(e) {}
 }
 
+// Appeler la fonction d'initialisation
+ajouterFondCommunes();
+
 function gererZoomCommune(nomCommune) {
-  if (!coucheFondCommunes) return;
+  if (!coucheFondCommunes) {
+    console.warn("coucheFondCommunes n'est pas encore prête.");
+    return;
+  }
 
   const communeNorm = normaliserTexte(nomCommune);
   let layerCible = null;
@@ -244,25 +256,24 @@ function styleConstruPlanifiees(feature) {
 
 function styleConsoPlanifiee(feature) {
   const p = feature.properties || {};
-  const typezone = p.typezone ? p.typezone.toString().trim().toUpperCase() : "";
+  const zone = (p.typezone || p.typeZone || p.TYPEZONE || "").toString().trim().toUpperCase();
 
-  let fillColor = "#95a5a6"; // Couleur par défaut (gris)
-
-  // 1. Attribution des couleurs selon le type de zone
-  if (typezone === "U" || typezone.startsWith("U")) {
-    fillColor = "#f14125"; // Rouge / ENAF en zone U
-  } else if (typezone === "AU" || typezone.startsWith("1AU") || typezone.startsWith("AU_")) {
-    fillColor = "#eb8f2d"; // Orange / ENAF en zone AU ouverte
-  } else if (typezone === "AU0" || typezone.startsWith("2AU") || typezone.startsWith("AU0_")) {
-    fillColor = "#dce135"; // Jaune / ENAF en zone AU fermée
+  let fillColor = "#cccccc"; // Gris par défaut si non trouvé
+  if (zone === "U") {
+    fillColor = "#f14125"; // Rouge
+  } else if (zone === "AU" || zone === "1AU") {
+    fillColor = "#eb8f2d"; // Orange
+  } else if (zone === "AU0" || zone === "2AU") {
+    fillColor = "#dce135"; // Jaune
   }
 
   return {
     fillColor: fillColor,
     weight: 1,
-    opacity: 0.9,
-    color: "#ffffff",
-    fillOpacity: 0.85
+    opacity: 1,
+    color: 'white',
+    dashArray: '3',
+    fillOpacity: 0.7
   };
 }
 function stylePotentielDensif(feature) { return {}; }
@@ -278,20 +289,23 @@ legendConstruEffectives.onAdd = function () {
   div.style.fontSize = '12px';
   div.style.lineHeight = '18px';
   div.innerHTML = `
-    <strong style="display:block; margin-bottom:5px;">Typologie & Périodes</strong>
+    <strong style="display:block; margin-bottom:5px; color:#2c3e50;">Densification (DC, DP, RU)</strong>
     <b>Division parcellaire / Dent creuse (DC / DP)</b><br>
     <i style="background:#4ea3dd; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2009–2022<br>
     <i style="background:#2f55a4; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2022–2025<br>
-    <b style="margin-top:5px; display:block;">Renouvellement urbain</b>
+    
+    <b style="margin-top:4px; display:block;">Renouvellement urbain (RU)</b>
     <i style="background:#f1c40f; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2009–2022<br>
     <i style="background:#f39c12; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2022–2025<br>
-    <b style="margin-top:5px; display:block;">Extension</b>
+
+    <hr style="margin: 8px 0; border: none; border-top: 3px solid #ddd;">
+    
+    <strong style="display:block; margin-bottom:5px; color:#2c3e50;">Extension</strong>
     <i style="background:#e74c3c; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2009–2022<br>
     <i style="background:#7b1113; width:14px; height:14px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> 2022–2025<br>
   `;
   return div;
 };
-
 const legendConsoEffective = L.control({ position: 'bottomright' });
 legendConsoEffective.onAdd = function () {
   const div = L.DomUtil.create('div', 'info legend');
@@ -344,35 +358,19 @@ legendConstruPlanifiees.onAdd = function () {
     <strong style="display:block; margin-bottom:8px; color:#2c3e50;">Logements autorisés et projetés</strong>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
       <span style="background:#dce135; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>PC en cours</span>
+      <span>PC accordés</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
       <span style="background:#fca038; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>U__OAP</span>
-    </div>
-    <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#fca038; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>U__pas d’OAP</span>
-    </div>
-    <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#fca038; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>U__AU__OAP</span>
+      <span>U</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
       <span style="background:#f14125; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>AU__OAP</span>
-    </div>
-    <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#f14125; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>AU__pas d’OAP</span>
+      <span>AU</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
       <span style="background:#61413a; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>AU0__OAP</span>
-    </div>
-    <div style="display:flex; align-items:center; margin-bottom:3px;">
-      <span style="background:#61413a; width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #fff;"></span>
-      <span>AU0__pas d’OAP</span>
+      <span>AU0</span>
     </div>
     <div style="display:flex; align-items:center; margin-bottom:3px;">
       <span style="background:repeating-linear-gradient(45deg, #000, #000 2px, #fff 2px, #fff 6px); width:16px; height:16px; border-radius:2px; display:inline-block; margin-right:8px; border:1px solid #000;"></span>
@@ -415,14 +413,58 @@ legendConsoPlanifiee.onAdd = function () {
 
 function genererContenuPopup(properties) {
   if (!properties) return "<em>Aucune donnée disponible</em>";
+
+  // Liste des champs à afficher (avec l'ajout de typezone, FORMDOMI, Destination et Surf)
+  const champsAffiches = [
+    "Commune", "Destinatio", "Urbanisati", "Type2Urban", 
+    "NBLogement", "NBT1", "NBT2", "NBT3", "NBT4", 
+    "LgtEtudian", "LgtSociaux", "LgtSeniors", "LgtAccesAb", "LgtPrives", 
+    "Collectifs", "Individuel", "GrpHabitat", "lots", 
+    "Nom_Operat", "Shape_Area", "DateLivrai", "ETAT",
+    "typezone", "FORMDOMI", "Destination", "Surf"
+  ];
+
+  // Liste des champs numériques qui ne doivent s'afficher que si leur valeur est != 0
+  const champsExclusSiZero = [
+    "nblogement", "nbt1", "nbt2", "nbt3", "nbt4", 
+    "lgtetudian", "lgtsociaux", "lgtseniors", "lgtaccesab", "lgtprives", 
+    "collectifs", "individuel", "grphabitat", "lots"
+  ];
+
   let html = "<div style='font-family: sans-serif; font-size: 13px;'>";
   html += "<strong style='color: #2b5c8f;'>Informations Foncières</strong><br><hr style='margin:4px 0;'>";
-  for (const [key, value] of Object.entries(properties)) {
-    if (["gid", "id", "fid", "geom"].includes(key.toLowerCase())) continue;
-    if (value !== null && value !== undefined) {
-      html += `<b>${key} :</b> ${value}<br>`;
+
+  let elementsAjoutes = 0;
+
+  champsAffiches.forEach(champ => {
+    const cleTrouvee = Object.keys(properties).find(k => k.toLowerCase() === champ.toLowerCase());
+
+    if (cleTrouvee && properties[cleTrouvee] !== null && properties[cleTrouvee] !== undefined && properties[cleTrouvee] !== "") {
+      let valeur = properties[cleTrouvee];
+      const champLower = champ.toLowerCase();
+
+      // Vérification : si c'est un champ de la liste et qu'il vaut 0, on l'ignore
+      if (champsExclusSiZero.includes(champLower)) {
+        const numVal = Number(valeur);
+        if (isNaN(numVal) || numVal === 0) {
+          return; 
+        }
+      }
+
+      // Formatage propre pour la surface (Shape_Area ou Surf)
+      if ((champLower === "shape_area" || champLower === "surf") && !isNaN(valeur)) {
+        valeur = Number(valeur).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " ha";
+      }
+
+      html += `<b>${champ} :</b> ${valeur}<br>`;
+      elementsAjoutes++;
     }
+  });
+
+  if (elementsAjoutes === 0) {
+    html += "<em>Aucune information disponible</em>";
   }
+
   html += "</div>";
   return html;
 }

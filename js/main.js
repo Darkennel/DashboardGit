@@ -2,36 +2,10 @@
 let activeGeoJsonLayer = null;
 let currentLegendControl = null;
 
-// Cache pour stocker les fichiers GeoJSON déjà chargés
-const geojsonCache = {};
-
-// Fonction pour charger dynamiquement le fichier .geojson
-async function chargerDonneesGeoJSON(url) {
-  if (!url) return null;
-  
-  // Si le fichier est déjà en cache, on le réutilise directement
-  if (geojsonCache[url]) {
-    return geojsonCache[url];
-  }
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Erreur HTTP ${response.status}`);
-    }
-    const data = await response.json();
-    geojsonCache[url] = data; // Stockage en cache
-    return data;
-  } catch (error) {
-    console.error(`Impossible de charger le GeoJSON à l'adresse : ${url}`, error);
-    return null;
-  }
-}
-
 // Initialisation au chargement de la page
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initThemeSelector();
-  initCommunes();
+  await initCommunes(); // attendre le remplissage du <select>
   changerTheme(document.getElementById("theme-select").value);
 });
 
@@ -75,10 +49,25 @@ function adapterSelecteursFiltres(allowedFilters) {
   if (allowedFilters.periode) {
     const selectPeriode = document.getElementById("periode-select");
     selectPeriode.innerHTML = '<option value="">-- Toutes les périodes --</option>';
+    
+    const currentTheme = document.getElementById("theme-select")?.value;
+
     allowedFilters.periode.forEach(p => {
       const opt = document.createElement("option");
       opt.value = p;
-      opt.textContent = p.replace("_", " - ");
+
+      // Affichage propre selon le thème actif
+      if (currentTheme === "conso_effective") {
+        if (p.includes("09_")) {
+          opt.textContent = `20${p.replace("_", " - 20")}`;
+        } else {
+          opt.textContent = `20${p.substring(0,2)} - 20${p.substring(2)}`;
+        }
+      } else {
+        // Pour les constructions effectives (ex: 2009_2022 -> 2009 - 2022)
+        opt.textContent = p.replace("_", " - ");
+      }
+
       selectPeriode.appendChild(opt);
     });
   }
@@ -144,9 +133,24 @@ async function actualiserCarteEtDonnees(themeKey) {
       if (normaliserTexte(nomComProp) !== communeNorm) return false;
     }
 
-    // 2. Filtre Période (uniquement si le filtre est actif)
-    if (periodeNorm && config.filters.periode && !testerPeriode(p.DateLivrai || p.Millesime || p.millesime, periodeNorm)) {
-      return false;
+// 2. Filtre Période (uniquement si le filtre est actif)
+    if (periodeNorm && config.filters.periode) {
+      if (currentThemeKey === "conso_effective") {
+        // Gestion spécifique des colonnes de consommation effective
+        let cleProp = "Conso0922";
+        if (periodeNorm === "09_13") cleProp = "Conso0913";
+        else if (periodeNorm === "13_16") cleProp = "Conso1316";
+        else if (periodeNorm === "16_19") cleProp = "Conso1619";
+        else if (periodeNorm === "19_22") cleProp = "Conso1922";
+        
+        const valConso = Number(p[cleProp]) || 0;
+        if (valConso === 0) return false; // N'affiche que les entités ayant une consommation sur cette période
+      } else {
+        // Filtrage standard pour les autres thèmes
+        if (!testerPeriode(p.DateLivrai || p.Millesime || p.millesime, periodeNorm)) {
+          return false;
+        }
+      }
     }
     // 3. Filtre Destination (uniquement si le filtre est actif)
     if (destNorm && destNorm !== "TOUT") {
@@ -157,9 +161,6 @@ async function actualiserCarteEtDonnees(themeKey) {
 
     return true;
   });
-
-  // Mise à jour du compteur
-  document.getElementById("entites-count").textContent = featuresFiltrees.length.toLocaleString("fr-FR");
 
   // Créer un Pane dédié aux données actives si non existant (zIndex 450 > paneCommunes 350)
   if (!map.getPane('paneDonneesActives')) {
@@ -200,7 +201,7 @@ async function actualiserCarteEtDonnees(themeKey) {
   // Mise à jour de la Sidebar
   if (typeof config.updateTable === 'function') {
     // Passer la commune sélectionnée
-    config.updateTable(featuresFiltrees, communeNorm); 
+    config.updateTable(featuresFiltrees, communeNorm, periodeNorm); 
   }
 }
 
@@ -234,20 +235,21 @@ function mettreAJourTableauEnafActuel(data, commune) {
   `;
 }
 
-function mettreAJourTableauConsoEffective(data, commune) {
+function mettreAJourTableauConsoEffective(data, commune, periodeChoisie) {
   const container = document.getElementById("sidebar-recap-container");
   if (!container) return;
 
-  const stats = calculerConsoEffective(data);
+  const periodeEffective = periodeChoisie || "09_22";
+  const stats = calculerConsoEffective(data, periodeEffective);
 
-  // Formatage avec 1 décimale
   const fmtHa = (val) => val.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const libellePeriode = periodeEffective === "09_22" ? "2009-2022" : `20${periodeEffective.replace("_", " - 20")}`;
 
   container.innerHTML = `
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; background-color: #f39c12; color: #ffffff;">
       <tbody>
         <tr>
-          <td style="padding: 10px; font-weight: bold; vertical-align: middle;">Consommation d’ENAF</td>
+          <td style="padding: 10px; font-weight: bold; vertical-align: middle;">Consommation d’ENAF (${libellePeriode})</td>
           <td style="padding: 10px; text-align: right; line-height: 1.5;">
             <div>${fmtHa(stats.totaleHa)} ha</div>
             <div style="font-size: 0.9em; opacity: 0.9;">${fmtHa(stats.moyenneAnnuelleHa)} ha/an</div>
@@ -454,8 +456,43 @@ function mettreAJourTableauConstruPlanifiees(data, commune) {
   }
 }
 
-function mettreAJourTableauConsoPlanifiee(data, commune) {}
-function mettreAJourTableauPotentiel(data, commune) {}
+function mettreAJourTableauConsoPlanifiee(data, commune) {
+  const container = document.getElementById("sidebar-recap-container");
+  if (!container) return;
+
+  const stats = calculerConsoPlanifieeStats(data);
+  const fmtHa = (val) => val.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " ha";
+
+  const tableStyle = "width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.8em; background-color: #e67e22; color: #ffffff; text-align: center;";
+  const tdBorder = "border: 1px solid #d35400; padding: 6px;";
+
+  container.innerHTML = `
+    <table style="${tableStyle}">
+      <thead>
+        <tr>
+          <th style="${tdBorder}"></th>
+          <th style="${tdBorder}">En zone U</th>
+          <th style="${tdBorder}">En zone AU</th>
+          <th style="${tdBorder}">En zone AU0</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="${tdBorder} text-align: left; font-weight: bold;">Habitat ou mixte</td>
+          <td style="${tdBorder}">${fmtHa(stats.habitat.u)}</td>
+          <td style="${tdBorder}">${fmtHa(stats.habitat.au)}</td>
+          <td style="${tdBorder}">${fmtHa(stats.habitat.au0)}</td>
+        </tr>
+        <tr>
+          <td style="${tdBorder} text-align: left; font-weight: bold;">Activités-Equipements</td>
+          <td style="${tdBorder}">${fmtHa(stats.activite.u)}</td>
+          <td style="${tdBorder}">${fmtHa(stats.activite.au)}</td>
+          <td style="${tdBorder}">${fmtHa(stats.activite.au0)}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}function mettreAJourTableauPotentiel(data, commune) {}
 
 // Écouteurs d'événements pour le filtrage et le zoom
 document.getElementById("commune-select").addEventListener("change", (e) => {
@@ -484,6 +521,11 @@ document.getElementById("btn-reset").addEventListener("click", () => {
 // Écouteur pour l'export vectoriel SVG
 document.getElementById("btn-export-svg")?.addEventListener("click", () => {
   exporterCarteSVG();
+});
+
+// Écouteur pour l'export image PNG
+document.getElementById("btn-export-png")?.addEventListener("click", () => {
+  exporterCartePNG();
 });
 
 function mettreAJourTableauIndicateursCaracterisation(features, communeNorm = "") {
@@ -519,3 +561,39 @@ function mettreAJourTableauIndicateursCaracterisation(features, communeNorm = ""
     </table>
   `;
 }
+
+// ==========================================
+// AFFICHAGE DOCS DEFINITION
+// ==========================================
+const modalDefinition = document.getElementById("modal-definition");
+const btnAfficherDef = document.getElementById("btn-afficher-definition");
+const btnFermerModal = document.getElementById("btn-fermer-modal");
+const pdfViewer = document.getElementById("pdf-viewer");
+const pdfFallbackLink = document.getElementById("pdf-fallback-link");
+const modalTitle = document.getElementById("modal-title");
+
+btnAfficherDef?.addEventListener("click", () => {
+  const currentThemeKey = document.getElementById("theme-select").value;
+  const config = THEMES_CONFIG[currentThemeKey];
+
+  if (config && config.pdf) {
+    pdfViewer.data = config.pdf;
+    pdfFallbackLink.href = config.pdf;
+    modalTitle.textContent = `Définition : ${config.label}`;
+    modalDefinition.style.display = "flex";
+  } else {
+    alert("Aucun document PDF n'est associé à ce thème.");
+  }
+});
+
+btnFermerModal?.addEventListener("click", () => {
+  modalDefinition.style.display = "none";
+  pdfViewer.data = ""; 
+});
+
+modalDefinition?.addEventListener("click", (e) => {
+  if (e.target === modalDefinition) {
+    modalDefinition.style.display = "none";
+    pdfViewer.data = "";
+  }
+});

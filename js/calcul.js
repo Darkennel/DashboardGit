@@ -124,23 +124,36 @@ function calculerSurfacesEnafActuel(features) {
   };
 }
 
-function calculerConsoEffective(features) {
+function calculerConsoEffective(features, periodeChoisie = "09_22") {
   let surfaceTotaleHa = 0;
+  let clePropriete = "Conso0922"; // Par défaut
+
+  // Association de la période au champ GeoJSON correspondant
+  if (periodeChoisie === "09_13") clePropriete = "Conso0913";
+  else if (periodeChoisie === "13_16") clePropriete = "Conso1316";
+  else if (periodeChoisie === "16_19") clePropriete = "Conso1619";
+  else if (periodeChoisie === "19_22") clePropriete = "Conso1922";
+  else if (periodeChoisie === "09_22") clePropriete = "Conso0922";
 
   features.forEach(f => {
     const p = f.properties || {};
-    // La surface est déjà exprimée en hectares
-    const area = Number(p.Conso0922) || 0;
+    // Utilisation de Math.abs car les valeurs stockées sont négatives dans le GeoJSON
+    const area = Math.abs(Number(p[clePropriete]) || 0);
     surfaceTotaleHa += area;
   });
 
-  // Période 2009-2022 = 13 ans
-  const nbAnnees = 13;
-  const consoMoyenneAnnuelleHa = surfaceTotaleHa / nbAnnees;
+  // Calcul du nombre d'années selon la période sélectionnée pour la moyenne annuelle
+  let nbAnnees = 13; // 2009-2022
+  if (periodeChoisie === "09_13" || periodeChoisie === "13_16" || periodeChoisie === "16_19" || periodeChoisie === "19_22") {
+    nbAnnees = 4; // Tranches de 4 ans
+  }
+
+  const consoMoyenneAnnuelleHa = nbAnnees > 0 ? surfaceTotaleHa / nbAnnees : 0;
 
   return {
     totaleHa: surfaceTotaleHa,
-    moyenneAnnuelleHa: consoMoyenneAnnuelleHa
+    moyenneAnnuelleHa: consoMoyenneAnnuelleHa,
+    periodeLibelle: periodeChoisie.replace("_", "-")
   };
 }
 
@@ -223,17 +236,22 @@ function calculerPlanifieesLogements(features) {
 
   features.forEach(f => {
     const p = f.properties || {};
-    // Tolérance sur le nom des clés (statut / STATUT / etat / ETAT)
-    const statut = normaliserTexte(p.Statut || p.STATUT || p.etat || p.ETAT);
+    const etat = p.ETAT ? p.ETAT.toString().trim().toUpperCase() : "";
     const type = normaliserTexte(p.Type2Urban || p.type2urban || p.type);
     const nbLog = Number(p.NBLogement || p.NBLOGEMENT || p.nb_logement || p.Nblogement) || 0;
 
+    // 1. Exclure CONSTRUIT et NULL / vide
+    if (etat === "CONSTRUIT" || etat === "" || etat === "NULL") return;
+
     const isConso = (type === 'ext' || type === 'extension');
 
-    if (statut.includes('autoris') || statut === 'pc') {
+    // 2. Autorisés = PC uniquement
+    if (etat === "PC") {
       if (isConso) autConso += nbLog;
       else autDensif += nbLog;
-    } else if (statut.includes('projet') || statut.includes('u_') || statut.includes('au')) {
+    } 
+    // 3. Projetés = Tout le reste (AU, U, etc.)[cite: 46]
+    else {
       if (isConso) projConso += nbLog;
       else projDensif += nbLog;
     }
@@ -248,16 +266,22 @@ function calculerPlanifieesActEquipSurfaces(features) {
 
   features.forEach(f => {
     const p = f.properties || {};
-    const statut = normaliserTexte(p.ETAT);
+    const etat = p.ETAT ? p.ETAT.toString().trim().toUpperCase() : "";
     const type = normaliserTexte(p.Type2Urban);
-    const areaM2 = Number(p.Shape_Area)|| 0;
+    const areaM2 = Number(p.Shape_Area || p.SHAPE_AREA) || 0;
 
-    const isConso = (type === 'EXT' || type === 'extension');
+    // 1. Exclure CONSTRUIT et NULL / vide
+    if (etat === "CONSTRUIT" || etat === "" || etat === "NULL") return;
 
-    if (statut.includes('autoris') || statut === 'PC') {
+    const isConso = (type === 'ext' || type === 'extension');
+
+    // 2. Autorisés = PC uniquement[cite: 46]
+    if (etat === "PC") {
       if (isConso) autConsoM2 += areaM2;
       else autDensifM2 += areaM2;
-    } else if (statut.includes('projet') || statut.includes('u_') || statut.includes('au')) {
+    } 
+    // 3. Projetés = Tout le reste[cite: 46]
+    else {
       if (isConso) projConsoM2 += areaM2;
       else projDensifM2 += areaM2;
     }
@@ -271,32 +295,35 @@ function calculerPlanifieesActEquipSurfaces(features) {
   };
 }
 
-// Calcul en SURFACES (hectares) pour Activités & Équipements (Constructions Planifiées)
-function calculerPlanifieesActEquipSurfaces(features) {
-  let autConsoM2 = 0, autDensifM2 = 0;
-  let projConsoM2 = 0, projDensifM2 = 0;
+function calculerConsoPlanifieeStats(features) {
+  let habitatU = 0, habitatAU = 0, habitatAU0 = 0;
+  let activiteU = 0, activiteAU = 0, activiteAU0 = 0;
 
   features.forEach(f => {
     const p = f.properties || {};
-    const statut = normaliserTexte(p.Statut || p.STATUT);
-    const type = normaliserTexte(p.Type2Urban);
-    const areaM2 = Number(p.Shape_Area || p.SHAPE_AREA) || 0;
+    const typeZone = p.typezone ? p.typezone.toString().trim().toUpperCase() : "";
+    const destination = normaliserTexte(p.Destination || p.destination || p.DESTINATION);
+    const surfaceHa = Number(p.Surf || p.SURF || p.Shape_Area) || 0;
 
-    const isConso = (type === 'ext' || type === 'extension');
+    // Détermination de la ligne (Habitat vs Activités)
+    const isHabitat = destination.includes("habitat") || destination.includes("mixte");
+    const isActivite = destination.includes("activite") || destination.includes("equipement");
 
-    if (statut === 'autorise' || statut === 'autorisee') {
-      if (isConso) autConsoM2 += areaM2;
-      else autDensifM2 += areaM2;
-    } else if (statut === 'projete' || statut === 'projetee') {
-      if (isConso) projConsoM2 += areaM2;
-      else projDensifM2 += areaM2;
+    // Ventilation par colonne (Zone U, AU, AU0)
+    if (typeZone === "U") {
+      if (isHabitat) habitatU += surfaceHa;
+      else if (isActivite) activiteU += surfaceHa;
+    } else if (typeZone === "AU" || typeZone.startsWith("1AU")) {
+      if (isHabitat) habitatAU += surfaceHa;
+      else if (isActivite) activiteAU += surfaceHa;
+    } else if (typeZone === "AU0" || typeZone.startsWith("2AU")) {
+      if (isHabitat) habitatAU0 += surfaceHa;
+      else if (isActivite) habitatAU0 += surfaceHa;
     }
   });
 
   return {
-    autConsoHa: autConsoM2 / 10000,
-    autDensifHa: autDensifM2 / 10000,
-    projConsoHa: projConsoM2 / 10000,
-    projDensifHa: projDensifM2 / 10000
+    habitat: { u: habitatU, au: habitatAU, au0: habitatAU0 },
+    activite: { u: activiteU, au: activiteAU, au0: activiteAU0 }
   };
 }

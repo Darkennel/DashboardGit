@@ -451,9 +451,10 @@ function genererContenuPopup(properties) {
         }
       }
 
-      // Formatage propre pour la surface (Shape_Area ou Surf)
+      // Formatage propre pour la surface (Shape_Area ou Surf) avec conversion m² -> ha
       if ((champLower === "shape_area" || champLower === "surf") && !isNaN(valeur)) {
-        valeur = Number(valeur).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " ha";
+        let valeurHa = Number(valeur) / 10000; // <-- Division par 10000 ici
+        valeur = valeurHa.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " ha";
       }
 
       html += `<b>${champ} :</b> ${valeur}<br>`;

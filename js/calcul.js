@@ -327,3 +327,25 @@ function calculerConsoPlanifieeStats(features) {
     activite: { u: activiteU, au: activiteAU, au0: activiteAU0 }
   };
 }
+
+function calculerPotentielStats(features) {
+  let pddHa = 0;
+  let p0dHa = 0;
+
+  features.forEach(f => {
+    const p = f.properties || {};
+    const pot = (p.potentiel || "").toString().trim().toUpperCase();
+    const surfHa = (Number(p.surface || p.Shape_Area || p.SHAPE_AREA) || 0) / 10000;
+    if (pot === "PDD") {
+      pddHa += surfHa;
+    } else if (pot === "P0D") {
+      p0dHa += surfHa;
+    }
+  });
+
+  return {
+    pddHa,
+    p0dHa,
+    totalHa: pddHa + p0dHa
+  };
+}

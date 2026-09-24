@@ -127,13 +127,13 @@ async function actualiserCarteEtDonnees(themeKey) {
 
     // 1. Filtre Lieu (Gestion de __NOMCOM et des autres variantes possibles)
     if (communeNorm) {
-      const nomComProp = p.__NOMCOM || p.NOMCOM || p.nom_com || p.Commune || 
+      const nomComProp = p.__NOMCOM || p.NOMCOM || p.nom_com || p.Commune || p._NOMCOM ||
                          p.commune || p.COMMUNE || p.nomcom || p.nom_commune || p.lib_com;
       
       if (normaliserTexte(nomComProp) !== communeNorm) return false;
     }
 
-// 2. Filtre Période (uniquement si le filtre est actif)
+  // 2. Filtre Période (uniquement si le filtre est actif)
     if (periodeNorm && config.filters.periode) {
       if (currentThemeKey === "conso_effective") {
         // Gestion spécifique des colonnes de consommation effective
@@ -169,14 +169,18 @@ async function actualiserCarteEtDonnees(themeKey) {
   }
 
   // Instancier la nouvelle couche GeoJSON avec le Pane dédié
-  activeGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: featuresFiltrees }, {
+activeGeoJsonLayer = L.geoJSON({ type: "FeatureCollection", features: featuresFiltrees }, {
     pane: 'paneDonneesActives',
     style: config.style,
     onEachFeature: (feature, layer) => {
-      // 1. Liaison du Popup d'information
-      layer.bindPopup(genererContenuPopup(feature.properties));
+      // 1. Liaison du Popup spécifique au thème
+      if (typeof config.popupContent === 'function') {
+        layer.bindPopup(config.popupContent(feature.properties));
+      } else {
+        layer.bindPopup(genererContenuPopup(feature.properties));
+      }
 
-      // 2. Appel spécifique au thème si présent (ex: marqueurs de logement)
+      // 2. Appel spécifique au thème si présent
       if (typeof config.onEachFeature === 'function') {
         config.onEachFeature(feature, layer);
       }
@@ -492,7 +496,40 @@ function mettreAJourTableauConsoPlanifiee(data, commune) {
       </tbody>
     </table>
   `;
-}function mettreAJourTableauPotentiel(data, commune) {}
+}
+function mettreAJourTableauPotentiel(data, commune) {
+  const container = document.getElementById("sidebar-recap-container");
+  if (!container) return;
+
+  const stats = calculerPotentielStats(data);
+  const fmtHa = (val) => val.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " ha";
+
+  const tableStyle = "width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85em; background-color: #2c3e50; color: #ffffff;";
+  const tdLabelStyle = "padding: 8px; border-bottom: 1px solid #34495e; font-weight: bold;";
+  const tdValStyle = "padding: 8px; border-bottom: 1px solid #34495e; text-align: right; white-space: nowrap;";
+
+  container.innerHTML = `
+    <div style="font-weight: bold; font-size: 0.9em; margin-top: 15px; color: #2c3e50;">
+      Potentiel de densification
+    </div>
+    <table style="${tableStyle}">
+      <tbody>
+        <tr>
+          <td style="${tdLabelStyle}">PDD (Potentiel diffus)</td>
+          <td style="${tdValStyle}">${fmtHa(stats.pddHa)}</td>
+        </tr>
+        <tr>
+          <td style="${tdLabelStyle}">P0D (Autre / Sans potentiel)</td>
+          <td style="${tdValStyle}">${fmtHa(stats.p0dHa)}</td>
+        </tr>
+        <tr>
+          <td style="${tdLabelStyle}">Total</td>
+          <td style="${tdValStyle}">${fmtHa(stats.totalHa)}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
 
 // Écouteurs d'événements pour le filtrage et le zoom
 document.getElementById("commune-select").addEventListener("change", (e) => {
@@ -568,8 +605,7 @@ function mettreAJourTableauIndicateursCaracterisation(features, communeNorm = ""
 const modalDefinition = document.getElementById("modal-definition");
 const btnAfficherDef = document.getElementById("btn-afficher-definition");
 const btnFermerModal = document.getElementById("btn-fermer-modal");
-const pdfViewer = document.getElementById("pdf-viewer");
-const pdfFallbackLink = document.getElementById("pdf-fallback-link");
+const pdfContainer = document.getElementById("pdf-container");
 const modalTitle = document.getElementById("modal-title");
 
 btnAfficherDef?.addEventListener("click", () => {
@@ -577,9 +613,15 @@ btnAfficherDef?.addEventListener("click", () => {
   const config = THEMES_CONFIG[currentThemeKey];
 
   if (config && config.pdf) {
-    pdfViewer.data = config.pdf;
-    pdfFallbackLink.href = config.pdf;
     modalTitle.textContent = `Définition : ${config.label}`;
+    
+    // Réinjection propre de l'élément <object> pour forcer le navigateur à actualiser le PDF
+    pdfContainer.innerHTML = `
+      <object id="pdf-viewer" data="${config.pdf}" type="application/pdf" width="100%" height="100%">
+        <p>Votre navigateur ne peut pas afficher ce PDF. <a id="pdf-fallback-link" href="${config.pdf}" target="_blank">Télécharger le PDF</a>.</p>
+      </object>
+    `;
+    
     modalDefinition.style.display = "flex";
   } else {
     alert("Aucun document PDF n'est associé à ce thème.");
@@ -588,12 +630,12 @@ btnAfficherDef?.addEventListener("click", () => {
 
 btnFermerModal?.addEventListener("click", () => {
   modalDefinition.style.display = "none";
-  pdfViewer.data = ""; 
+  pdfContainer.innerHTML = ""; // Nettoyage à la fermeture
 });
 
 modalDefinition?.addEventListener("click", (e) => {
   if (e.target === modalDefinition) {
     modalDefinition.style.display = "none";
-    pdfViewer.data = "";
+    pdfContainer.innerHTML = ""; // Nettoyage à la fermeture
   }
 });

@@ -276,7 +276,27 @@ function styleConsoPlanifiee(feature) {
     fillOpacity: 0.7
   };
 }
-function stylePotentielDensif(feature) { return {}; }
+
+function stylePotentielDensif(feature) {
+  const p = feature.properties || {};
+  const potentiel = (p.potentiel || "").toString().trim().toUpperCase();
+  let fillColor = "#cccccc"; // Gris par défaut si non trouvé
+
+  if (potentiel === "PDD") {
+    fillColor = "#dfe447";
+  } else if (potentiel === "P0D") {
+    fillColor = "#d94d2e";
+  }
+
+  return {
+    fillColor: fillColor,
+    weight: 1,
+    opacity: 1,
+    color: 'white',
+    dashArray: '3',
+    fillOpacity: 0.7
+  };
+}
 
 // LÉGENDES
 const legendConstruEffectives = L.control({ position: 'bottomright' });
@@ -306,6 +326,7 @@ legendConstruEffectives.onAdd = function () {
   `;
   return div;
 };
+
 const legendConsoEffective = L.control({ position: 'bottomright' });
 legendConsoEffective.onAdd = function () {
   const div = L.DomUtil.create('div', 'info legend');
@@ -411,59 +432,72 @@ legendConsoPlanifiee.onAdd = function () {
   return div;
 };
 
-function genererContenuPopup(properties) {
-  if (!properties) return "<em>Aucune donnée disponible</em>";
+const legendPotentiel = L.control({ position: 'bottomright' });
+legendPotentiel.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.style.backgroundColor = 'white';
+  div.style.padding = '10px 14px';
+  div.style.borderRadius = '5px';
+  div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+  div.style.fontSize = '12px';
+  div.style.lineHeight = '20px';
+  div.innerHTML = `
+    <strong style="display:block; margin-bottom:8px; color:#2c3e50;">Potentiel de densification</strong>
+    <div style="display:flex; align-items:center; margin-bottom:4px;">
+      <span style="background:#dfe447; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>PDD (Potentiel diffus)</span>
+    </div>
+    <div style="display:flex; align-items:center;">
+      <span style="background:#d94d2e; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
+      <span>P0D (Autre / Sans potentiel)</span>
+    </div>
+  `;
+  return div;
+};
 
-  // Liste des champs à afficher (avec l'ajout de typezone, FORMDOMI, Destination et Surf)
-  const champsAffiches = [
-    "Commune", "Destinatio", "Urbanisati", "Type2Urban", 
-    "NBLogement", "NBT1", "NBT2", "NBT3", "NBT4", 
-    "LgtEtudian", "LgtSociaux", "LgtSeniors", "LgtAccesAb", "LgtPrives", 
-    "Collectifs", "Individuel", "GrpHabitat", "lots", 
-    "Nom_Operat", "Shape_Area", "DateLivrai", "ETAT",
-    "typezone", "FORMDOMI", "Destination", "Surf"
-  ];
-
-  // Liste des champs numériques qui ne doivent s'afficher que si leur valeur est != 0
-  const champsExclusSiZero = [
-    "nblogement", "nbt1", "nbt2", "nbt3", "nbt4", 
-    "lgtetudian", "lgtsociaux", "lgtseniors", "lgtaccesab", "lgtprives", 
-    "collectifs", "individuel", "grphabitat", "lots"
-  ];
-
+function genererPopupConstructionsCommunes(p) {
+  if (!p) return "<em>Aucune donnée disponible</em>";
+  
   let html = "<div style='font-family: sans-serif; font-size: 13px;'>";
-  html += "<strong style='color: #2b5c8f;'>Informations Foncières</strong><br><hr style='margin:4px 0;'>";
+  html += "<strong style='color: #2b5c8f;'>Informations Opération</strong><br><hr style='margin:4px 0;'>";
 
-  let elementsAjoutes = 0;
+  const commune = p.Commune || p.NOMCOM || p.nom_com || 'N/C';
+  html += `<b>Commune :</b> ${commune}<br>`;
 
-  champsAffiches.forEach(champ => {
-    const cleTrouvee = Object.keys(properties).find(k => k.toLowerCase() === champ.toLowerCase());
+  if (p.ETAT) html += `<b>ETAT :</b> ${p.ETAT}<br>`;
+  if (p.DateLivrai) html += `<b>Date de livraison :</b> ${p.DateLivrai}<br>`;
+  if (p.Destinatio) html += `<b>Destination :</b> ${p.Destinatio}<br>`;
+  if (p.Type2Urban) html += `<b>Type 2 Urban :</b> ${p.Type2Urban}<br>`;
+  if (p.Urbanisati || p.Urbanisation) html += `<b>Urbanisation :</b> ${p.Urbanisati || p.Urbanisation}<br>`;
+  if (p.NBLogement !== undefined) html += `<b>Nombre de logements :</b> ${p.NBLogement}<br>`;
 
-    if (cleTrouvee && properties[cleTrouvee] !== null && properties[cleTrouvee] !== undefined && properties[cleTrouvee] !== "") {
-      let valeur = properties[cleTrouvee];
-      const champLower = champ.toLowerCase();
+  // Types de logements affichés uniquement si >= 1
+  const typesLogements = [
+    { key: 'NBT1', label: 'T1' },
+    { key: 'NBT2', label: 'T2' },
+    { key: 'NBT3', label: 'T3' },
+    { key: 'NBT4', label: 'T4+' },
+    { key: 'LgtEtudian', label: 'Logements étudiants' },
+    { key: 'LgtSociaux', label: 'Logements sociaux' },
+    { key: 'LgtSeniors', label: 'Logements séniors' },
+    { key: 'LgtAccesAb', label: 'Logements accès abordable' },
+    { key: 'LgtPrives', label: 'Logements privés' },
+    { key: 'Collectifs', label: 'Collectifs' },
+    { key: 'Individuel', label: 'Individuel' },
+    { key: 'GrpHabitat', label: 'Groupement d\'habitat' },
+    { key: 'lots', label: 'Lots' }
+  ];
 
-      // Vérification : si c'est un champ de la liste et qu'il vaut 0, on l'ignore
-      if (champsExclusSiZero.includes(champLower)) {
-        const numVal = Number(valeur);
-        if (isNaN(numVal) || numVal === 0) {
-          return; 
-        }
-      }
-
-      // Formatage propre pour la surface (Shape_Area ou Surf) avec conversion m² -> ha
-      if ((champLower === "shape_area" || champLower === "surf") && !isNaN(valeur)) {
-        let valeurHa = Number(valeur) / 10000; // <-- Division par 10000 ici
-        valeur = valeurHa.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " ha";
-      }
-
-      html += `<b>${champ} :</b> ${valeur}<br>`;
-      elementsAjoutes++;
+  typesLogements.forEach(item => {
+    const val = Number(p[item.key]) || 0;
+    if (val >= 1) {
+      html += `<b>${item.label} :</b> ${val}<br>`;
     }
   });
 
-  if (elementsAjoutes === 0) {
-    html += "<em>Aucune information disponible</em>";
+  if (p.Shape_Area || p.SHAPE_AREA) {
+    const surfHa = (Number(p.Shape_Area || p.SHAPE_AREA) / 10000).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+    html += `<b>Surface :</b> ${surfHa} ha<br>`;
   }
 
   html += "</div>";
@@ -599,5 +633,88 @@ function exporterCarteSVG() {
     setTimeout(genererSVG, 150);
   } else {
     genererSVG();
+  }
+}
+// ==========================================
+// EXPORTER LA CARTE EN PNG (Correction définitive html2canvas)
+// ==========================================
+function exporterCartePNG() {
+  const mapContainer = document.getElementById("map");
+
+  if (!mapContainer) {
+    alert("Conteneur de carte introuvable.");
+    return;
+  }
+
+  const selectCommune = document.getElementById("commune-select");
+  const nomCommuneSelectionnee = selectCommune ? selectCommune.value : "";
+  const communeNorm = normaliserTexte(nomCommuneSelectionnee);
+
+  let targetBounds = null;
+
+  if (communeNorm && coucheFondCommunes) {
+    coucheFondCommunes.eachLayer(layer => {
+      const props = layer.feature ? layer.feature.properties : {};
+      const nomFeature = normaliserTexte(props.NOMCOM || props.nom_com || props.Commune || props.name);
+      
+      if (nomFeature === communeNorm) {
+        if (typeof layer.getBounds === "function") {
+          targetBounds = layer.getBounds();
+        }
+      }
+    });
+  }
+
+  const lancerCapture = () => {
+    map.invalidateSize(true);
+
+    setTimeout(() => {
+      // Utilisation de html2canvas avec la fonction onclone pour corriger le rendu des calques Leaflet
+      html2canvas(mapContainer, {
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        scale: window.devicePixelRatio > 1 ? window.devicePixelRatio : 1, // Conserve une bonne netteté
+        onclone: (clonedDoc) => {
+          // Dans le document cloné par html2canvas, on s'assure que les panes Leaflet n'ont pas de décalage parasite
+          const clonedMap = clonedDoc.getElementById("map");
+          if (clonedMap) {
+            // Force l'affichage global du conteneur de carte sans transformation globale bloquante
+            clonedMap.style.transform = "none";
+          }
+        }
+      }).then(canvas => {
+        const imageURL = canvas.toDataURL("image/png");
+
+        const themeSelect = document.getElementById("theme-select")?.value || "carte";
+        const nomFichierCommune = nomCommuneSelectionnee ? nomCommuneSelectionnee.replace(/[^a-zA-Z0-9]/g, "_") : "SICOVAL";
+
+        const link = document.createElement("a");
+        link.href = imageURL;
+        link.download = `carte_${themeSelect}_${nomFichierCommune}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }).catch(err => {
+        console.error("Erreur lors de l'export PNG avec html2canvas :", err);
+        alert("Une erreur est survenue lors de la génération de l'image PNG.");
+      });
+    }, 400);
+  };
+
+  if (targetBounds && targetBounds.isValid()) {
+    map.invalidateSize(true);
+
+    // Centrage propre sur la commune
+    map.fitBounds(targetBounds, {
+      padding: [40, 40],
+      animate: false
+    });
+
+    map.once('moveend', () => {
+      lancerCapture();
+    });
+  } else {
+    lancerCapture();
   }
 }

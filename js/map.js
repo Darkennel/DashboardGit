@@ -31,7 +31,7 @@ let coucheFondCommunes = null;
 
 async function ajouterFondCommunes() {
   // Attente du chargement effectif des données
-  communesData = await chargerDonneesGeoJSON('datageojson/CommunesSico.geojson');
+  communesData = await chargerDonneesGeoJSON('datageojson/CommunesSico2.geojson');
 
   console.log("ajouterFondCommunes - communesData:", communesData);
 
@@ -85,7 +85,7 @@ function gererZoomCommune(nomCommune) {
         color: "#d35400",
         weight: 3.5,
         fillColor: "#f39c12",
-        fillOpacity: 0.15,
+        fillOpacity: 0.05,
         dashArray: null
       });
     } else {
@@ -273,7 +273,7 @@ function styleConsoPlanifiee(feature) {
     opacity: 1,
     color: 'white',
     dashArray: '3',
-    fillOpacity: 0.7
+    fillOpacity: 0.4
   };
 }
 
@@ -290,7 +290,7 @@ function stylePotentielDensif(feature) {
 
   return {
     fillColor: fillColor,
-    weight: 1,
+    weight: 0.1,
     opacity: 1,
     color: 'white',
     dashArray: '3',
@@ -449,7 +449,7 @@ legendPotentiel.onAdd = function () {
     </div>
     <div style="display:flex; align-items:center;">
       <span style="background:#d94d2e; width:16px; height:16px; border-radius:3px; display:inline-block; margin-right:8px;"></span>
-      <span>P0D (Autre / Sans potentiel)</span>
+      <span>Pop Potentiel D'opération</span>
     </div>
   `;
   return div;
